@@ -112,7 +112,7 @@ class TrackDownloader():
                 self.errMsg = ''
                 self.download_file =  stdOut[idx1:idx2+4]
                 logit("Downloaded file: " + self.download_file)
-                self.track.album = self.track_album
+                self.track.album = self.track_album if self.track.title != self.track_album else ''
                 (self.track.file_path, self.track.artist, self.track.title)  = self.clean_filepath(self.download_file)
                 trim_audio(self.track.file_path)
         else:

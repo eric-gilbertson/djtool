@@ -15,6 +15,17 @@ VLC like media player optimized for use in live radio features include:
 - Output device selection (first entry tries to be internal speakers)
 - Save/Load .m3u playlists (ignores non .wav/.mp3 lines)
 """
+import gettext
+_real_translation = gettext.translation
+
+def safe_translation(domain, localedir=None, languages=None, class_=None, fallback=False):
+    try:
+        return _real_translation(domain, localedir, languages, class_, fallback=True)
+    except Exception:
+        return gettext.NullTranslations()
+
+gettext.translation = safe_translation
+
 import glob,  json,  os,  pathlib,  platform,  pyaudio,  shlex, webbrowser
 import shutil,  sys,  threading,  time,  traceback
 import tkinter as tk,  traceback
@@ -45,14 +56,30 @@ def seconds_from_HMS(time_hms):
     return seconds
 
 
+def resource_path(relative_path):
+    """
+    Return absolute path to resource.
+    Works for development and PyInstaller.
+    """
+    if getattr(sys, 'frozen', False):
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
 class AudioPlaylistApp(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
 
         if platform.system() == 'Darwin':
             # ---- macOS Dock reopen handler ----
-            dock_icon = PhotoImage(file='./djtool.png')
-            self.iconphoto(True, dock_icon)
+            full_path = resource_path('djtool.png')
+            print(f"fullpath {full_path}")
+            if os.path.exists(full_path):
+                dock_icon = PhotoImage(file=resource_path('./djtool.png'))
+                self.iconphoto(True, dock_icon)
+
             self.createcommand(
                 "tk::mac::ReopenApplication",
                 self.on_dock_reopen
@@ -978,9 +1005,13 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             self.stop_audio()
         else:
             logit("play from pause")
-            next_track = self.get_next_track_for_playback(self._track_id)
-            self._play_track_from_id(next_track.id)
-            return
+            # if there is a user selection then play from it, else continue from
+            # last track played, e.g. hit pause & no continue
+            if len(self.tree.selection()) > 0:
+                self.play_selected()
+            else:
+                next_track = self.get_next_track_for_playback(self._track_id)
+                self._play_track_from_id(next_track.id)
 
     def live_show_change(self):
         if self.live_show.get():
@@ -1051,11 +1082,20 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             self.play_selected()
 
     def play_selected(self):
-        selected = self.tree.selection()
-        if len(selected) > 0:
-            rowid = selected[0]
-            logit(f"play selected: {rowid}")
-            self._play_track_from_id(rowid)
+        row_id = self.tree.selection()[0]
+        if len(row_id) > 0:
+            track = self.tree_datamap[row_id]
+            if track.is_stop_file():
+                next_idx = self._get_selected_index() + 1
+                rows = self.tree.get_children()
+                row_id = rows[next_idx] if next_idx < len(rows) else ''
+                track = self.tree_datamap[row_id]
+
+            if len(row_id) > 0:
+                logit(f"play selected: {row_id}, {track.title}")
+                self._play_track_from_id(row_id)
+            else:
+                logit('No selected track to play')
 
     def _play_index(self, index: int):
         logit(f'enter _play_index {index}')
