@@ -15,16 +15,16 @@ VLC like media player optimized for use in live radio features include:
 - Output device selection (first entry tries to be internal speakers)
 - Save/Load .m3u playlists (ignores non .wav/.mp3 lines)
 """
-import gettext
-_real_translation = gettext.translation
-
-def safe_translation(domain, localedir=None, languages=None, class_=None, fallback=False):
-    try:
-        return _real_translation(domain, localedir, languages, class_, fallback=True)
-    except Exception:
-        return gettext.NullTranslations()
-
-gettext.translation = safe_translation
+#import gettext
+#_real_translation = gettext.translation
+#
+#def safe_translation(domain, localedir=None, languages=None, class_=None, fallback=False):
+#    try:
+#        return _real_translation(domain, localedir, languages, class_, fallback=True)
+#    except Exception:
+#        return gettext.NullTranslations()
+#
+#gettext.translation = safe_translation
 
 import glob,  json,  os,  pathlib,  platform,  pyaudio,  shlex, webbrowser
 import shutil,  sys,  threading,  time,  traceback
