@@ -27,7 +27,7 @@ VLC like media player optimized for use in live radio features include:
 #gettext.translation = safe_translation
 
 import glob,  json,  os,  pathlib,  platform,  pyaudio,  shlex, webbrowser
-import shutil,  sys,  threading,  time,  traceback
+import shutil,  sys,  threading,  time,  traceback, subprocess
 import tkinter as tk,  traceback
 from tkinter import PhotoImage
 from tkinter import ttk, filedialog, messagebox, scrolledtext
@@ -56,29 +56,17 @@ def seconds_from_HMS(time_hms):
     return seconds
 
 
-def resource_path(relative_path):
-    """
-    Return absolute path to resource.
-    Works for development and PyInstaller.
-    """
-    if getattr(sys, 'frozen', False):
-        base_path = sys._MEIPASS
-    else:
-        base_path = os.path.abspath(".")
-
-    return os.path.join(base_path, relative_path)
-
 class AudioPlaylistApp(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
 
+        self.is_appbundle = getattr(sys, 'frozen', False)
+
         if platform.system() == 'Darwin':
             # ---- macOS Dock reopen handler ----
-            full_path = resource_path('djtool.png')
-            print(f"fullpath {full_path}")
-            if os.path.exists(full_path):
-                dock_icon = PhotoImage(file=resource_path('./djtool.png'))
-                self.iconphoto(True, dock_icon)
+            full_path = f"{self.get_resources_dir()}/djtool.png"
+            dock_icon = PhotoImage(file=full_path)
+            self.iconphoto(True, dock_icon)
 
             self.createcommand(
                 "tk::mac::ReopenApplication",
@@ -160,6 +148,14 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
         self.destroy()
 
+    def get_resources_dir(self):
+        if getattr(sys, 'frozen', False):
+            base_path = f"{sys._MEIPASS}/../Resources" # path when built with pyinstaller
+        else:
+            base_path = os.path.abspath(".")
+    
+        return base_path
+
     def _fetch_track(self, use_fullname=True):
         url_entry = self.urlEntry.get()
         if self.downloader.fetch_track(self, url_entry, use_fullname):
@@ -221,6 +217,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             menubar.add_cascade(menu=dummy_header)
             self.config(menu=menubar)
             dummy_header.destroy()
+
+        appmenu = tk.Menu(menubar, tearoff=0)
+        menubar.add_cascade(label="DJTool", menu=appmenu)
 
         filemenu = tk.Menu(menubar, tearoff=0)
         filemenu.add_command(label="Configure...", command=self._edit_configuration)
@@ -919,7 +918,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.set_title()
 
     def show_help_window(self):
-        full_path = f'file://{os.getcwd()}/djtool.html'
+        help_file = f"{self.get_resources_dir()}/djtool.html"
+        full_path = f'file://{help_file}'
         webbrowser.open(full_path)
 
     def show_log_window(self):
@@ -1141,6 +1141,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         logit(f"stop_audio: enter")
         self.player.stop_player()
 
+
     def _set_dirty(self, is_dirty):
         self.is_dirty = is_dirty
         if not self.player.is_playing():
@@ -1162,10 +1163,25 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
 
 if __name__ == "__main__":
+
+    # bundled vesions of the app use djtool as the Python interpreter so that 
+    # helpers like yt-dlp will run on systems that don't have Python installed.
+    if "-run_script" in sys.argv:
+        args = sys.argv[2:]
+        args_str  = ", ".join(args)
+        logit(f"run_script args: {", ".join(args)}")
+
+        try:
+            subprocess.run(args)
+        except Exception as e:
+            print(f"run_script exception: {e}")
+        sys.exit(0)
+
     app = AudioPlaylistApp()
     if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
         print("load playlist: " + sys.argv[1])
         app.load_playlist(sys.argv[1])
 
+    app.after(500, app.downloader.check_for_ytdlp)
     app.mainloop()
 

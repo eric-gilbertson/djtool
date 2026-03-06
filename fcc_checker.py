@@ -1,3 +1,5 @@
+from collections import Counter
+
 from system_config import SystemConfig
 import os, sys
 import spotipy
@@ -90,18 +92,27 @@ class FCCChecker():
 
     @staticmethod
     def fcc_song_check(artist, title):
-        BAD_WORDS = ["shit", "fuck", "asshole", 'nigger']
+        BAD_WORDS = ["shit", "fuck", "asshole", 'nigger', "bullshit"]
+
+        if len(artist) == 0 or artist == '-':
+            return FCCChecker.FCC_STATUS_AR[3], ''
 
         lyrics = get_lyrics_genius(artist, title)
         if lyrics:
-            lyrics = lyrics.lower()
+            lyrics_ar = lyrics.lower().split()
+            word_counts = Counter(lyrics_ar)
+
+            explicit_msg = ''
+            seperator = ''
             for word in BAD_WORDS:
-                if word in lyrics:
-                    msg = f'Genius explicit: {word}'
-                    logit(msg)
-                    return FCCChecker.FCC_STATUS_AR[1], msg
-    
-            return FCCChecker.FCC_STATUS_AR[0], ''
+                if (count := word_counts.get(word, 0)) > 0:
+                    explicit_msg = f'{explicit_msg}{seperator}{word} {count}x'
+                    seperator = ', '
+
+            if explicit_msg:
+                return FCCChecker.FCC_STATUS_AR[1], f'Genius explicit: {explicit_msg}'
+            else:
+                return FCCChecker.FCC_STATUS_AR[0], ''
 
         try:
             explicit = get_spotify_info(artist, title)

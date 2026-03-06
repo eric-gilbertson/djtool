@@ -2,11 +2,16 @@
 
 APP_NAME="DJTool"
 SCRIPT_NAME="djtool.py"
+YTDLP_PATH="/usr/local/bin/yt-dlp"
+FFMPEG_PATH="/usr/local/bin/ffmpeg"
 
 rm -rf dist/*
-pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "djtool.png:images" djtool.py
+pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "$YTDLP_PATH:." --add-data "$FFMPEG_PATH:." --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
+
 rm -rf dist/djtool
+
 create-dmg --icon "DJTool.app" 100 60  --app-drop-link 250  60   "dist/DJTool.dmg" ./dist
+
 scp dist/DJTool.dmg ericg@kzsu.stanford.edu:/media/kzsu-audio-archive1/kzsu-aircheck-archives/featured_programs
 
 

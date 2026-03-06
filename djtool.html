@@ -3,9 +3,9 @@
 DJ Tool is a music download and playlist management tool that is optimized for the the production of both live and pre-recorded radio programs. It's iTunes/VLC like interface  provides the following features:
 
 <ul>
-<li> Song lookup by artist and song title using fuzzy search</li>
-<li> Fast download of tracks from in broadcast ready format</li>
-<li> Automatic start/stop for mic breaks and pauses</li>
+<li> Song lookup by artist and song title using fuzzy search, e.g. Kinks ; Lola</li>
+<li> Fast download of tracks in broadcast ready format</li>
+<li> Automatic playback start/stop for mic breaks and pauses</li>
 <li> Drag and drop track reordering</li>
 <li> Show export as an MP3 file</li>
 <li> Automatic spin submission to playlist (live shows)</li>
@@ -53,7 +53,7 @@ Songs can be added to the playlist through the following actions:
 <li> Dragging a local audio file into DJTool</li>
 </ul>
 
-Songs are downloaded from YouTube by entering the URL of a video page or by entering the song info as <ARTIST_NAME> ; <SONG_TITLE> into the URL input field and clicking Fetch or entering '<CR>'. After 10s delay, a  broadcast ready (no ads and leading/trailing silence trimmed to 2 seconds) copy of the track will be added to your local drive as a wav file and appended to the playlist. Note that it is not necessary to enter full artist and title names. Entering enough to identify the song is sufficient, e.g "cliff; harder" would download Jimmy Cliff's great song.  If the song search returns multiple results, then a song a choice picker will be presented.  Note that you must install the yt-dlp open source application in order to use this feature, as described in the setup section. In order to accommodate copy/pasting of artist/sing from outside playlists, the URL input field also accepts tab and - as field  separaters.
+Songs are downloaded from YouTube by entering the URL of a video page or by entering the song info as <ARTIST_NAME> ; <SONG_TITLE> into the URL input field and clicking Fetch or entering '<CR>'. After 10s delay, a  broadcast ready (no ads and leading/trailing silence trimmed to 2 seconds) copy of the track will be added to your local drive as a wav file and appended to the playlist. Note that it is not necessary to enter full artist and title names. Entering enough of it to identify the song is sufficient, e.g "cliff; harder" would download Jimmy Cliff's great song.  If the song search returns multiple results, then a song a choice picker will be presented.  Note that you must install the yt-dlp open source application in order to use this feature, as described in the setup section. In order to accommodate copy/pasting of artist/sing from outside playlists, the URL input field also accepts tab and - as field  separaters.
 
 The album will be added to the playlist when downloading with the artist/title input format but not for downloads using the video URL. For the latter, the album titles can be found with the Find Albums feature.
 
@@ -142,6 +142,9 @@ All other DJTool functions are invoked via the application menu bar
 
 > Is there a warning when quitting with outstanding playlist edits
 # Yes
+
+> FCC check does not find a song that exists in Genius.com
+# Check the artist name and track title spellings
 
 
 

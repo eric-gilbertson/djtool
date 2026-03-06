@@ -46,6 +46,17 @@ class Track():
         dict = self.__dict__
         return dict
 
+    def reset(self):
+        self.id = -1
+        self.fcc_status = ''
+        self.fcc_comments = ''
+        self.artist = ''
+        self.title = ''
+        self.album = ''
+        self.label = ''
+        self.file_path = ''
+        self.duration = 0
+
     def album_display(self):
         retval =  f'{self.album} / {self.label}'
         return retval

@@ -1,5 +1,6 @@
 # asynchromously downloads a track using yt-dlp and performs name cleanup on the downloaded file.
 #
+import sys, platform, urllib, stat
 import threading, subprocess, shutil, re, os
 from pathlib import Path
 from tkinter import simpledialog
@@ -25,14 +26,29 @@ class CommandThread(threading.Thread):
         self.stderr = None
 
     def run(self):
+        logit(f"start thread execute: {self.cmd}")
         self.process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         (self.stdout, self.stderr) = self.process.communicate()
+        print(f"done thread execute: {self.cmd}")
         self.done_callback()
         pass
 
 class TrackDownloader():
     def __init__(self, parent, download_dir):
-        self.YTDL_PATH = shutil.which('yt-dlp')
+        # if running as a bundled app then use djtool as the Python interpreter so that yt-dlp
+        # will run even if the box does not have Python.
+        if parent.is_appbundle:
+            self.YTDL_PATH = f"{sys.executable} -run_script {parent.get_resources_dir()}/yt-dlp"
+        else:
+            self.YTDL_PATH = shutil.which('yt-dlp')
+
+        # use the bundled version of ffmpeg. assumes that non-bunble environments will that 
+        self.FFMPEG_PATH = f"{parent.get_resources_dir()}/ffmpeg"
+        if not os.path.exists(self.FFMPEG_PATH):
+            logit("FFMPEG not found.")
+            self.FFMPEG_PATH = ''
+
+        logit(f"Helper paths: -{self.YTDL_PATH}-, -{self.FFMPEG_PATH}-")
         self.download_dir = download_dir
         self.parent = parent
         self.download_thread = None
@@ -41,7 +57,6 @@ class TrackDownloader():
         self.track = Track(-1, '', '', '', '', '', '', '', 0)
         self.track_url = ''
         self.download_file = None
-        self.track_album = ''
         self.is_done = False
         self.fuzzy_search = FuzzyYTMusic()
 
@@ -50,18 +65,39 @@ class TrackDownloader():
             os.makedirs(download_dir)
 
 
+    def check_for_ytdlp(self):
+        if self.YTDL_PATH:
+            return
+
+        doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now? (Alternatively, you can install it manually per the instructions in the Vew->Help page)?', parent=self.parent)
+        if doit:
+            self.install_ytdlp()
+
+            title = "Success"
+            if not self.YTDL_PATH:
+                title = "Error"
+                message='Yt-dlp was not installed. See the log using View->Log file for more informaton.'
+            elif self.YTDL_PATH == self.ALT_YTDL_PATH:
+                message=f'Yt-dlp application was downloaded to {self.YTDL_PATH}. This will work but recommend that you copy the system folder by executing "sudo mv ~/Downloads/yt-dlp /usr/local/bin" from a terminal and then restarting DJTool'
+            else:
+                message=f'Yt-dlp has been installed to {self.YTDL_PATH}'
+
+
+            tk.messagebox.showwarning(title=title, message=message)
+
     def fetch_track(self, parent, track_specifier, use_fullname):
         logit(f"Enter fetch_track: {track_specifier}")
         is_url = 'https:/' in track_specifier
         ARTIST_TRACK_SEPARATOR = r'[-;\t]' # split on ; and <tab>
         artistTerm = '%(artist)s' if use_fullname  else 'UNKNOWN'
         out_file = '"{}/{}_%(title)s.%(ext)s"'.format(self.download_dir, artistTerm)
-        self.track_album = ''
+        self.track.reset()
         track_specifier_ar = re.split(ARTIST_TRACK_SEPARATOR, track_specifier)
         error_msg = '''Invalid song request. Enter either <ARTIST_NAME><SEPERATOR><SONG_TITLE> using -, ; or <TAB> as the artist/title separator or a YouTube song URL. Note that the artist and song values do not have to be complete, e.g. "Stones ; Satisfaction"  and that one of the values may be empty, e.g. use "Beatles;" to locate Beatles songs or ";Hallelujah" to find cover versions of that song. All entry values correctly spelled.'''
         
         if not self.YTDL_PATH:
-            tk.messagebox.showwarning(title="Error", message='The yt-dlp application was not found. Please install it as described in the help documentation and try again', parent=self.parent)
+            tk.messagebox.showwarning(title='Error', message='The yt-dlp application was not found. Please install it per the directions in the View->Help page', parent=self.parent)
+
             return False
 
         if not is_url and len(track_specifier_ar) <  2:
@@ -80,11 +116,13 @@ class TrackDownloader():
                 return False
             else:
                 dialog = SelectTrackDialog(parent, artist, title, tracks)
-                if not dialog.ok_clicked or len(dialog.track_id) == 0:
+                if not dialog.ok_clicked or len(dialog.track.id) == 0:
                     return False
 
-                self.track_album = dialog.album
-                self.track_url = f"https://youtube.com/watch?v={dialog.track_id}"
+                self.track.album = dialog.track.album
+                self.track.artist = dialog.track.artist
+                self.track.title = dialog.track.title
+                self.track_url = f"https://youtube.com/watch?v={dialog.track.id}"
         elif use_fullname:
             self.track_url = track_specifier
 
@@ -92,7 +130,8 @@ class TrackDownloader():
             tk.messagebox.showwarning(title="Error", message=error_msg, parent=self.parent)
             return False
 
-        cmd = self.YTDL_PATH + ' --extract-audio --audio-format wav -o {} {}'.format(out_file, self.track_url)
+        # passing in ffmpeg location because it may not be in the user's PATH
+        cmd = f'{self.YTDL_PATH} --ffmpeg-location {self.FFMPEG_PATH} --extract-audio --audio-format wav -o {out_file} {self.track_url}'
         self.is_done = False
         logit(f"Start download: {cmd}")
         self.download_thread = CommandThread(cmd, self.on_fetch_done)
@@ -112,8 +151,10 @@ class TrackDownloader():
                 self.errMsg = ''
                 self.download_file =  stdOut[idx1:idx2+4]
                 logit("Downloaded file: " + self.download_file)
-                self.track.album = self.track_album if self.track.title != self.track_album else ''
-                (self.track.file_path, self.track.artist, self.track.title)  = self.clean_filepath(self.download_file)
+                (self.track.file_path, file_artist, file_title)  = self.clean_filepath(self.download_file)
+                # use the title/artist from the downloaded iff it has not already been set.
+                self.track.artist = self.track.artist if self.track.artist else file_artist
+                self.track.title = self.track.title if self.track.title else file_title
                 trim_audio(self.track.file_path)
         else:
             logit(f"yt-dlp download error: {stdOut}, {self.err_msg}")
@@ -121,6 +162,27 @@ class TrackDownloader():
         self.is_done = True
 
 
+    # TODO: fix for Windows
+    def install_ytdlp(self):
+        url = "http://kzsu.stanford.edu/djtool/download?filename=yt-dlp"
+        try:
+            download_path = self.ALT_YTDL_PATH
+            logit(f"start yt-dlp download to {download_path}")
+            urllib.request.urlretrieve(url, download_path)
+            st = os.stat(download_path)
+            os.chmod(download_path, st.st_mode | stat.S_IEXEC)
+            target_path = '/usr/local/bin/yt-dlp'
+            if os.access(os.path.dirname(target_path), os.W_OK):
+                logit(f"move yt-dlp to {target_path}")
+                shutil.move(download_path, target_path)
+                self.YTDL_PATH = target_path
+            else:
+                self.YTDL_PATH = download_path
+            return True
+        except Exception as ex:
+            logit(f"Exception while downloading yt-dlp: {ex}")
+            return False
+            
     # normalizes files downloaded from YT & MPE into standard <ARTIST>^<TITLE> name format.
     @staticmethod
     def clean_filepath(filepath):
@@ -228,12 +290,13 @@ class TrackDownloader():
 class SelectTrackDialog(simpledialog.Dialog):
     def __init__(self, parent, artist, track_title, track_choices):
         # store initial values
-        self.artist = artist
-        self.track_title = track_title
-        self.album = ''
         self.track_choices = track_choices
-        self.track_id = ''
         self.ok_clicked = False
+
+        self.track = Track()
+        self.track.title = track_title
+        self.track.album = ''
+        self.track.artist = ''
         super().__init__(parent, title='Select Song')
 
     def body(self, master):
@@ -251,7 +314,7 @@ class SelectTrackDialog(simpledialog.Dialog):
             idx = idx + 1
 
         self.choices_entry.insert("1.0", tracks)
-        self.track_info.insert(0, f'{self.artist} - {self.track_title}')
+        self.track_info.insert(0, f'{self.track.artist} - {self.track.title}')
 
         if idx > 1:
             self.choice_entry.insert(0, '1')
@@ -272,8 +335,21 @@ class SelectTrackDialog(simpledialog.Dialog):
             self.ok_clicked = False
         elif len(choice) == 1:
             choice_num = int(choice) - 1
-            self.track_id = self.track_choices[choice_num]['videoId']
-            self.album = self.track_choices[choice_num]['album']['name']
+            track = self.track_choices[choice_num]
+            self.track.id = track['videoId']
+            self.track.album = track['album']['name']
+            self.track.title = track['title']
+
+            # often YT incorrectly assigns album as the title
+            if track.album  == self.track.title:
+                self.track.album = ''
+
+            artists = ''
+            seperator = ''
+            for artist in track['artists']:
+                artists = f'{artists}{seperator}{artist['name']}'
+                seperator = ', '
+            self.track.artist = artists
 
     def _select_row(self, event):
         index = self.choices_entry.index(f"@{event.x},{event.y}")
