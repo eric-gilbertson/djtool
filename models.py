@@ -61,6 +61,11 @@ class Track():
         retval =  f'{self.album} / {self.label}'
         return retval
 
+    def get_primary_artist(self):
+        delimiters = r'(,|;| with | ft\. | featuring '
+        artist_ar = re.split(delimiters, self.artist)
+        return artist_ar[0]
+
     def fetch_label(self):
         self.label = get_album_label(self.artist, self.album)
 
@@ -336,4 +341,7 @@ class UserConfiguration():
 
         return seconds
 
+    @staticmethod
+    def get_show_start():
+        return UserConfiguration.show_start_time
 

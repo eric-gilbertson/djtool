@@ -6,7 +6,7 @@ YTDLP_PATH="/usr/local/bin/yt-dlp"
 FFMPEG_PATH="/usr/local/bin/ffmpeg"
 
 rm -rf dist/*
-pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "$YTDLP_PATH:." --add-data "$FFMPEG_PATH:." --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
+pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "$YTDLP_PATH:helpers" --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
 
 rm -rf dist/djtool
 

@@ -26,27 +26,21 @@ class CommandThread(threading.Thread):
         self.stderr = None
 
     def run(self):
-        logit(f"start thread execute: {self.cmd}")
         self.process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         (self.stdout, self.stderr) = self.process.communicate()
-        print(f"done thread execute: {self.cmd}")
         self.done_callback()
         pass
 
 class TrackDownloader():
     def __init__(self, parent, download_dir):
-        # if running as a bundled app then use djtool as the Python interpreter so that yt-dlp
-        # will run even if the box does not have Python.
-        if parent.is_appbundle:
-            self.YTDL_PATH = f"{sys.executable} -run_script {parent.get_resources_dir()}/yt-dlp"
-        else:
-            self.YTDL_PATH = shutil.which('yt-dlp')
+        # use user installed verion if available, else use bundled version if availabe.
+        self.YTDL_PATH = shutil.which('yt-dlp')
+        if not self.YTDL_PATH and parent.is_appbundle:
+            self.YTDL_PATH = f"{parent.get_resources_dir()}/helpers/yt-dlp"
 
-        # use the bundled version of ffmpeg. assumes that non-bunble environments will that 
-        self.FFMPEG_PATH = f"{parent.get_resources_dir()}/ffmpeg"
-        if not os.path.exists(self.FFMPEG_PATH):
-            logit("FFMPEG not found.")
-            self.FFMPEG_PATH = ''
+        self.FFMPEG_PATH = shutil.which('ffmpeg')
+        if not self.FFMPEG_PATH and parent.is_appbundle:
+            self.FFMPEG_PATH = f"{parent.get_resources_dir()}/helpers/ffmpeg"
 
         logit(f"Helper paths: -{self.YTDL_PATH}-, -{self.FFMPEG_PATH}-")
         self.download_dir = download_dir
@@ -88,7 +82,7 @@ class TrackDownloader():
     def fetch_track(self, parent, track_specifier, use_fullname):
         logit(f"Enter fetch_track: {track_specifier}")
         is_url = 'https:/' in track_specifier
-        ARTIST_TRACK_SEPARATOR = r'[-;\t]' # split on ; and <tab>
+        ARTIST_TRACK_SEPARATOR = r' - |;|\t' # split on -, ; and <tab>
         artistTerm = '%(artist)s' if use_fullname  else 'UNKNOWN'
         out_file = '"{}/{}_%(title)s.%(ext)s"'.format(self.download_dir, artistTerm)
         self.track.reset()
@@ -97,7 +91,6 @@ class TrackDownloader():
         
         if not self.YTDL_PATH:
             tk.messagebox.showwarning(title='Error', message='The yt-dlp application was not found. Please install it per the directions in the View->Help page', parent=self.parent)
-
             return False
 
         if not is_url and len(track_specifier_ar) <  2:
@@ -288,15 +281,15 @@ class TrackDownloader():
 
 
 class SelectTrackDialog(simpledialog.Dialog):
-    def __init__(self, parent, artist, track_title, track_choices):
+    def __init__(self, parent, track_artist, track_title, track_choices):
         # store initial values
         self.track_choices = track_choices
         self.ok_clicked = False
 
         self.track = Track()
         self.track.title = track_title
+        self.track.artist = track_artist
         self.track.album = ''
-        self.track.artist = ''
         super().__init__(parent, title='Select Song')
 
     def body(self, master):
@@ -333,7 +326,7 @@ class SelectTrackDialog(simpledialog.Dialog):
         choice = self.choice_entry.get()
         if len(choice) == 0:
             self.ok_clicked = False
-        elif len(choice) == 1:
+        else:
             choice_num = int(choice) - 1
             track = self.track_choices[choice_num]
             self.track.id = track['videoId']
@@ -341,7 +334,7 @@ class SelectTrackDialog(simpledialog.Dialog):
             self.track.title = track['title']
 
             # often YT incorrectly assigns album as the title
-            if track.album  == self.track.title:
+            if self.track.album  == self.track.title:
                 self.track.album = ''
 
             artists = ''

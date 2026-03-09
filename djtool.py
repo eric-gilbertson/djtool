@@ -796,7 +796,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         if SystemConfig.check_have_genius_key():
             for track in self.tree_datamap.values():
                 if not track.have_fcc_status() and not track.is_stop_file() and not track.is_spot_file():
-                    status, comment = FCCChecker.fcc_song_check(track.artist, track.title)
+                    status, comment = FCCChecker.fcc_song_check(track.get_primary_artist(), track.title)
                     track.fcc_status = status
                     track.fcc_comment = comment
                     row_values = self.tree.item(track.id)["values"]
@@ -879,6 +879,13 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 file_name = os.path.basename(t.file_path).lower()
                 if t.is_audio_file():
                    include_timestamps = True
+
+            if include_timestamps:
+                show_start_time = UserConfiguration.show_start_time
+                msg = f'The timestamps in the playlist will be based on a show start time of {show_start_time}. If this is incorrect, click Cancel and set the correct show start time using the File->Configure menu and try again.'
+
+                if not tk.messagebox.askokcancel(title="Confirm Show Start Time", message=msg, parent= self):
+                    return
 
             # write app playlist
             with open(fp, 'w', encoding='utf-8') as json_file:
@@ -1163,20 +1170,6 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
 
 if __name__ == "__main__":
-
-    # bundled vesions of the app use djtool as the Python interpreter so that 
-    # helpers like yt-dlp will run on systems that don't have Python installed.
-    if "-run_script" in sys.argv:
-        args = sys.argv[2:]
-        args_str  = ", ".join(args)
-        logit(f"run_script args: {", ".join(args)}")
-
-        try:
-            subprocess.run(args)
-        except Exception as e:
-            print(f"run_script exception: {e}")
-        sys.exit(0)
-
     app = AudioPlaylistApp()
     if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
         print("load playlist: " + sys.argv[1])

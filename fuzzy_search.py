@@ -59,6 +59,8 @@ class FuzzyYTMusic:
 
         target_artist = self.normalize(artist)
         target_title = self.normalize(title)
+        if not target_artist and not target_title:
+            return None
 
         # Initial query
         query = f"{artist} {title}"
@@ -72,18 +74,18 @@ class FuzzyYTMusic:
             candidates.append((score, result))
 
         # If nothing found, try looser query strategies
-        if not candidates or max(c[0] for c in candidates) < min_score:
-            fallback_queries = [
-                title,              # title only
-                artist,             # artist only
-                f"{title} {artist}" # reversed order
-            ]
-
-            for q in fallback_queries:
-                results = self.yt.search(q, filter="songs", limit=limit)
-                for result in results:
-                    score = self.score_candidate(result, target_artist, target_title)
-                    candidates.append((score, result))
+        # if not candidates or max(c[0] for c in candidates) < min_score:
+        #     fallback_queries = [
+        #         title,              # title only
+        #         artist,             # artist only
+        #         f"{title} {artist}" # reversed order
+        #     ]
+        #
+        #     for q in fallback_queries:
+        #         results = self.yt.search(q, filter="songs", limit=limit)
+        #         for result in results:
+        #             score = self.score_candidate(result, target_artist, target_title)
+        #             candidates.append((score, result))
 
         if not candidates:
             return None
