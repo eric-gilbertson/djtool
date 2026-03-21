@@ -3,33 +3,42 @@ import ssl
 import tkinter.messagebox
 import urllib
 from  tkinter import messagebox
+
+import yaml
+
 from djutils import logit
 
-SPOTIFY_ID = ''
-SPOTIFY_SECRET = ''
-GENIUS_APIKEY = ''
-PLAYLIST_APIKEY = '8v3TC5vf8zVpwUuQ0K4uCz7kYBcTZj7i'
-PLAYLIST_HOST = 'http://localhost:5000'
-OUTPUT_DEVICE = ''
-
 class SystemConfig():
-    spotify_id = SPOTIFY_ID
-    spotify_secret = SPOTIFY_SECRET
-    genius_apikey = GENIUS_APIKEY
-    user_apikey = PLAYLIST_APIKEY
-    playlist_host = PLAYLIST_HOST
-    output_device = OUTPUT_DEVICE
+    spotify_id = ''
+    spotify_secret = ''
+    genius_apikey = ''
+    playlist_host = ''
+    output_device = ''
+    user_apikey = ''
 
     @staticmethod
     def load_config(user_apikey_arg):
-        host = PLAYLIST_HOST if PLAYLIST_HOST else 'https://kzsu.stanford.edu'
+        config_dict = {} 
+        try:
+            with open('system_config.yaml', 'r') as file:
+                config_dict = yaml.safe_load(file)
+        except Exception as ex:
+            logit(f'Error reading system_config.yaml configuration file: {ex}')
+
+        SystemConfig.playlist_host = config_dict.get('PLAYLIST_HOST', 'https://kzsu.stanford.edu')
+        SystemConfig.spotify_id = config_dict.get('SPOTIFY_ID', '')
+        SystemConfig.spotify_secret = config_dict.get('SPOTIFY_SECRET', '')
+        SystemConfig.genius_apikey = config_dict.get('GENIUS_APIKEY', '')
+        SystemConfig.output_device = config_dict.get('OUTPUT_DEVICE', '')
+        SystemConfig.user_apikey = config_dict.get('USER_APIKEY', '')
+
         if user_apikey_arg:
             SystemConfig.user_apikey = user_apikey_arg
 
-        if host and (not SystemConfig.spotify_id or not SystemConfig.spotify_secret or not SystemConfig.genius_apikey):
+        if SystemConfig.user_apikey and not SystemConfig.spotify_id or not SystemConfig.spotify_secret or not SystemConfig.genius_apikey:
             try:
                 ssl_context = ssl._create_unverified_context()
-                req = urllib.request.Request(host + '/djtool/helpertokens/')
+                req = urllib.request.Request(SystemConfig.playlist_host + '/djtool/helpertokens/')
                 req.add_header("Content-type", "application/vnd.api+json")
                 req.add_header("Accept", "text/plain")
                 req.add_header("X-APIKEY", SystemConfig.user_apikey)
@@ -45,8 +54,6 @@ class SystemConfig():
                         SystemConfig.genius_apikey = resp_obj.get('genius_apikey', None)
             except Exception as e:
                 logit(f"Exception geting apikeys, {e}")
-                msg = '''FCC checking and album lookup are not available because the helper keylookup failed.  Check that your user key in the File->Configuration dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
-                tkinter.messagebox.showwarning("Configuration Error", msg)
 
     @staticmethod
     def check_have_user_key():
@@ -73,6 +80,7 @@ class SystemConfig():
 
         return not msg
 
+    @staticmethod
     def check_have_genius_key():
         msg = None
         if not SystemConfig.genius_apikey:

@@ -7,7 +7,7 @@ from spotipy.oauth2 import SpotifyClientCredentials
 import lyricsgenius
 from djutils import logit
 
-
+# requires spotify premium account
 def get_album_label(artist_name, album_name):
     have_keys = SystemConfig.spotify_id and SystemConfig.spotify_secret
 
@@ -37,7 +37,7 @@ def get_album_label(artist_name, album_name):
 
     return album_label
 
-
+# requires spotify premium account
 def get_spotify_info(artist, title):
     is_explicit = None
     if not SystemConfig.spotify_id or not SystemConfig.spotify_secret:
@@ -80,7 +80,12 @@ def get_lyrics_genius(normalized_artist: str, normalized_title: str) -> str:
             title=normalized_title,
             artist=primary_artist,
         )
-        retval =  song.lyrics if song else None
+
+        # TODO check for artist match, e.g. steven stills season of the witch
+        if song:
+            logit(f"Found song {normalized_title}: {song.api_path}")
+            retval = song.lyrics
+
     except Exception as ex:
         logit(f"Error fetching Genius lyrics {normalized_title}, {ex}")
 
@@ -114,14 +119,15 @@ class FCCChecker():
             else:
                 return FCCChecker.FCC_STATUS_AR[0], ''
 
-        try:
-            explicit = get_spotify_info(artist, title)
-            if explicit:
-                msg = f'Spotify explicit flag'
-                logit(msg)
-                return FCCChecker.FCC_STATUS_AR[1], msg
-        except Exception as ex:
-            logit(f"Error fetching Spotify info {title}, {ex}")
+# getting explicit from Spotify requires a premium account
+#        try:
+#            explicit = get_spotify_info(artist, title)
+#            if explicit:
+#                msg = f'Spotify explicit flag'
+#                logit(msg)
+#                return FCCChecker.FCC_STATUS_AR[1], msg
+#        except Exception as ex:
+#            logit(f"Error fetching Spotify info {title}, {ex}")
 
 
         return FCCChecker.FCC_STATUS_AR[2], ''

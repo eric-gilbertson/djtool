@@ -5,6 +5,11 @@ SCRIPT_NAME="djtool.py"
 YTDLP_PATH="/usr/local/bin/yt-dlp"
 FFMPEG_PATH="/usr/local/bin/ffmpeg"
 
+if [[ -z $VIRTUAL_ENV ]]; then
+  echo "\$VIRUTALN_ENV is empty or not set"
+  exit 0
+fi
+
 rm -rf dist/*
 pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "$YTDLP_PATH:helpers" --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
 

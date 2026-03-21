@@ -185,7 +185,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
                 # TODO: do these in background
                 status, comment = FCCChecker.fcc_song_check(track.artist, track.title)
-                track.fetch_label()
+                #track.fetch_label() - requires spotify premium
 
                 self.url.delete(0, "end")
                 self.url.config(cursor="")
@@ -1175,6 +1175,6 @@ if __name__ == "__main__":
         print("load playlist: " + sys.argv[1])
         app.load_playlist(sys.argv[1])
 
-    app.after(500, app.downloader.check_for_ytdlp)
+    app.after(500, app.downloader.check_dependencies()
     app.mainloop()
 

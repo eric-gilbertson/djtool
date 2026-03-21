@@ -12,7 +12,7 @@ from pydub import AudioSegment
 from  system_config import SystemConfig
 from commondefs import *
 
-import pyaudio, os
+import os
 
 from djutils import logit
 from fcc_checker import get_album_label
@@ -62,10 +62,12 @@ class Track():
         return retval
 
     def get_primary_artist(self):
-        delimiters = r'(,|;| with | ft\. | featuring '
+        delimiters = r'(,|;| with | ft\. | featuring )'
+
         artist_ar = re.split(delimiters, self.artist)
         return artist_ar[0]
 
+    # requires spotify premium account
     def fetch_label(self):
         self.label = get_album_label(self.artist, self.album)
 

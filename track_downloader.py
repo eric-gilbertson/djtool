@@ -12,7 +12,8 @@ from fuzzy_search import FuzzyYTMusic
 
 from audio_trimmer import trim_audio
 from models import Track
-from djutils import logit
+from djutils import logit, compare_python_versions, get_certifi_version, upgrade_certifi
+from system_config import SystemConfig
 
 FIELD_SEPARATOR = '^'
 
@@ -59,25 +60,66 @@ class TrackDownloader():
             os.makedirs(download_dir)
 
 
-    def check_for_ytdlp(self):
-        if self.YTDL_PATH:
+    def check_dependencies(self):
+        msg = None
+        python_path = shutil.which('python3')
+        if not python_path:
+            msg = "Python3 not found. Python 3.10+ is required to download songs. It can be obtained from https://www.python.org/downloads/. See the directions found under View->Help for more information."
+        else:
+            # get python from shell because tha't what yt-dlp will use.
+            cmd = f'{python_path} --version'
+            self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+            (stdout, stderr) = self.process.communicate()
+            python_version = str(stdout).split()[1]
+            python_version = re.sub(r"\\.*", "", python_version)
+            if compare_python_versions(python_version, '3.10') < 0:
+                msg = f"Found Python {python_version} but Python 3.10+ is needed in order to download songs. It can be obtained from https://www.python.org/downloads/. See the directions found under View->Help for more information."
+
+        if msg:
+            tk.messagebox.showwarning(title="Error", message=msg, parent=self.parent)
             return
 
-        doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now? (Alternatively, you can install it manually per the instructions in the Vew->Help page)?', parent=self.parent)
-        if doit:
-            self.install_ytdlp()
+        certifi_version = get_certifi_version(python_path)
+        logit(f'Certifi version -{certifi_version}-')
+        if not certifi_version or certifi_version < '2026.1.1':
+            msg = f'The certifi package version -{certifi_version}-, does not support song downloading. Would you like to install/upgrade it so that you can download music?'
+            doit = tk.messagebox.askokcancel(title="Invalid Certifi Version", message=msg, parent=self.parent)
+            if doit:
+                if not upgrade_certifi(python_path):
+                    msg = f'An error occurred while installing certifi'
 
-            title = "Success"
-            if not self.YTDL_PATH:
-                title = "Error"
-                message='Yt-dlp was not installed. See the log using View->Log file for more informaton.'
-            elif self.YTDL_PATH == self.ALT_YTDL_PATH:
-                message=f'Yt-dlp application was downloaded to {self.YTDL_PATH}. This will work but recommend that you copy the system folder by executing "sudo mv ~/Downloads/yt-dlp /usr/local/bin" from a terminal and then restarting DJTool'
-            else:
-                message=f'Yt-dlp has been installed to {self.YTDL_PATH}'
+        if not self.YTDL_PATH:
+            doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now? (Alternatively, you can install it manually per the instructions in the Vew->Help page)?', parent=self.parent)
+            if doit:
+                self.install_ytdlp()
 
+                title = "Success"
+                if not self.YTDL_PATH:
+                    title = "Error"
+                    message='Yt-dlp was not installed. See the log using View->Log file for more informaton.'
+                elif self.YTDL_PATH == self.ALT_YTDL_PATH:
+                    message=f'Yt-dlp application was downloaded to {self.YTDL_PATH}. This will work but recommend that you copy the system folder by executing "sudo mv ~/Downloads/yt-dlp /usr/local/bin" from a terminal and then restarting DJTool'
+                else:
+                    message=f'Yt-dlp has been installed to {self.YTDL_PATH}'
 
-            tk.messagebox.showwarning(title=title, message=message)
+                tk.messagebox.showwarning(title=title, message=message)
+
+        if not SystemConfig.user_apikey:
+            message=f'Playlist updating is not available because the userapi key has not been set. See View->Help for setup help information.'
+            tk.messagebox.showwarning(title='Incomplete Setup', message=message)
+        elif not SystemConfig.spotify_id or not SystemConfig.spotify_secret:
+            msg = '''Spotify features are not available because the Spotify
+                 apikeys have not been set. Check that your user key in the File->Configuration
+                 dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
+
+            tk.messagebox.showwarning("Configuration Error", msg)
+        elif not SystemConfig.genius_apikey:
+            msg = '''The FCC check feature is not available because the Genius
+                 apikey has not been set. Check that your user key in the File->Configuration
+                 dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
+
+            tk.messagebox.showwarning("Configuration Error", msg)
+
 
     def fetch_track(self, parent, track_specifier, use_fullname):
         logit(f"Enter fetch_track: {track_specifier}")
