@@ -64,7 +64,7 @@ class TrackDownloader():
         msg = None
         python_path = shutil.which('python3')
         if not python_path:
-            msg = "Python3 not found. Python 3.10+ is required to download songs. It can be obtained from https://www.python.org/downloads/. See the directions found under View->Help for more information."
+            msg = "Python3 not found. Python 3.10+ is required to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
         else:
             # get python from shell because tha't what yt-dlp will use.
             cmd = f'{python_path} --version'
@@ -73,7 +73,7 @@ class TrackDownloader():
             python_version = str(stdout).split()[1]
             python_version = re.sub(r"\\.*", "", python_version)
             if compare_python_versions(python_version, '3.10') < 0:
-                msg = f"Found Python {python_version} but Python 3.10+ is needed in order to download songs. It can be obtained from https://www.python.org/downloads/. See the directions found under View->Help for more information."
+                msg = f"Found Python {python_version} but Python 3.10+ is needed in order to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
 
         if msg:
             tk.messagebox.showwarning(title="Error", message=msg, parent=self.parent)
@@ -105,7 +105,7 @@ class TrackDownloader():
                 tk.messagebox.showwarning(title=title, message=message)
 
         if not SystemConfig.user_apikey:
-            message=f'Playlist updating is not available because the userapi key has not been set. See View->Help for setup help information.'
+            message=f'Playlist updating is not available because your User API Key has not been set. Enter your administrator supplied apikey using the File->Configuration dialog. See View->Help for setup help information.'
             tk.messagebox.showwarning(title='Incomplete Setup', message=message)
         elif not SystemConfig.spotify_id or not SystemConfig.spotify_secret:
             msg = '''Spotify features are not available because the Spotify

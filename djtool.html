@@ -37,7 +37,7 @@ The following steps describe how to use DJTool for live shows. Note that songs c
 
 <h3> Quickstart Hints</h3>
 <li>If song search fails, use direct entry of the YouTube video URL</li>
-<li>Entering <Space> toggles between play and stop modes</li>
+<li>Entering <Space> toggles between play and pause modes</li>
 <li>Songs can be downloaded during playback</li>
 <li>Fast switch to another track by double clicking it</li>
 <li>Each track spin will be automatically add to you Zookeeper playlist</li>
@@ -117,16 +117,21 @@ This function generates an MP3 representation of the entire program that is suit
 This picker selects the output device used when playing tracks. The output can be directed to the board's Aux Codec input by connecting it to your laptop and selecting using this control.
 
 
+<h2>Installing Python3</h2>
+In order to download songs from YouTube, DJTool requires that Python3.10+ be installed on your system (DJTool will run without Python3 but song downloading will fail). You will be alerted upon startup if Python3 is missing or too old. Python3 can be installed by visitng https://www.python.org/downloads/ and following the directions for your platform. Alternatively, you can use the homebrew (for Mac) or UntGetUI (for (Windows) to install it.
+
 <h2> Function Shortcuts</h2>
 The following keyboard shortcuts can be used to invoke common operations:
 
-  <SPACE> - toggles between play and pause modes
-  <DELETE> - deletes the selected playlist entries 
-  <Shift-Click> - invokes track editor for the target track
-  <DOUBLE-CLICK> - starts playback on the target file
-  <ENTER> - initiates song download (when entered into the URL input field
-  <DRAG_DROP> - imports external files that are dragged from 'finder' tools
-  <Shift-Drag> - relocates track position within the playlist
+<ul>
+<li>  <SPACE> - toggles between play and pause modes</li>
+<li>  <DELETE> - deletes the selected playlist entries </li>
+<li>  <Shift-Click> - invokes track editor for the target track</li>
+<li>  <DOUBLE-CLICK> - starts playback on the target file</li>
+<li>  <ENTER> - initiates song download (when entered into the URL input field</li>
+<li>  <DRAG_DROP> - imports external files that are dragged from 'finder' tools</li>
+<li>  <Shift-Drag> - relocates track position within the playlist</li>
+</ul>
 
 All other DJTool functions are invoked via the application menu bar 
 

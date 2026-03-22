@@ -1175,6 +1175,6 @@ if __name__ == "__main__":
         print("load playlist: " + sys.argv[1])
         app.load_playlist(sys.argv[1])
 
-    app.after(500, app.downloader.check_dependencies()
+    app.after(500, app.downloader.check_dependencies())
     app.mainloop()
 
