@@ -26,7 +26,7 @@ VLC like media player optimized for use in live radio features include:
 #
 #gettext.translation = safe_translation
 
-import glob,  json,  os,  pathlib,  platform,  pyaudio,  shlex, webbrowser
+import glob,  json,  os,  pathlib,  platform,  pyaudio,  shlex, webbrowser, ctypes
 import shutil,  sys,  threading,  time,  traceback, subprocess
 import tkinter as tk,  traceback
 from tkinter import PhotoImage
@@ -80,6 +80,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             if EXTRA_PATHS[0] not in current_path:
                logit("adding extra paths to PATH")
                os.environ["PATH"] = ":".join(EXTRA_PATHS + [current_path])
+        elif platform.system() == 'Windows':
+            full_path = f"{self.get_resources_dir()}/djtool.ico"
+            self.iconbitmap(full_path)
           
         self.DEFAULT_TITLE = "DJ Tool"
         self.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -149,8 +152,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.destroy()
 
     def get_resources_dir(self):
-        if getattr(sys, 'frozen', False):
-            base_path = f"{sys._MEIPASS}/../Resources" # path when built with pyinstaller
+        if getattr(sys, 'frozen', False) and platform.system() == 'Darwin':
+            base_path = f"{sys._MEIPASS}/../Resources"
         else:
             base_path = os.path.abspath(".")
     
@@ -1170,6 +1173,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
 
 if __name__ == "__main__":
+    # Set AppUserModelID BEFORE creating Tk window
+    if platform.system() == 'Windows':
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("mr.bones_djtool")
+
     app = AudioPlaylistApp()
     if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
         print("load playlist: " + sys.argv[1])
