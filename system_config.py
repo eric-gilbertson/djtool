@@ -25,6 +25,7 @@ class SystemConfig():
         except Exception as ex:
             logit(f'Error reading system_config.yaml configuration file: {ex}')
 
+        config_dict = config_dict if config_dict else {} 
         SystemConfig.playlist_host = config_dict.get('PLAYLIST_HOST', 'https://kzsu.stanford.edu')
         SystemConfig.spotify_id = config_dict.get('SPOTIFY_ID', '')
         SystemConfig.spotify_secret = config_dict.get('SPOTIFY_SECRET', '')

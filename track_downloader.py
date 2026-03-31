@@ -39,9 +39,10 @@ class TrackDownloader():
         if not self.YTDL_PATH and parent.is_appbundle:
             self.YTDL_PATH = f"{parent.get_resources_dir()}/helpers/yt-dlp"
 
-        self.FFMPEG_PATH = shutil.which('ffmpeg')
+        FFMPEG_NAME = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
+        self.FFMPEG_PATH = shutil.which(FFMPEG_NAME)
         if not self.FFMPEG_PATH and parent.is_appbundle:
-            self.FFMPEG_PATH = f"{parent.get_resources_dir()}/helpers/ffmpeg"
+            self.FFMPEG_PATH = f"{parent.get_resources_dir()}/helpers/{FFMPEG_NAME}"
 
         logit(f"Helper paths: -{self.YTDL_PATH}-, -{self.FFMPEG_PATH}-")
         self.download_dir = download_dir
