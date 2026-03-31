@@ -823,8 +823,18 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
         audio_files = glob.glob(dir_path + "/*.mp3") + glob.glob(dir_path + "/*.wav")
         new_files = False
+        WAV_CHECK_SIZE = 100000000
+        MP3_CHECK_SIZE = 10000000
         for idx, file_path in enumerate(audio_files):
             if not file_path in current_files:
+                file_size = os.path.getsize(file_path)
+                file_ext = extension = pathlib.Path(file_path).suffix
+                if (file_ext == ".mp3" and file_size > MP3_CHECK_SIZE) or file_size > WAV_CHECK_SIZE:
+                    file_name = pathlib.Path(file_path).name
+                    msg = f'File -{file_name}- is very large. Do you want to import it?'
+                    if not messagebox.askyesno("Confirm Operation", msg, parent=self):
+                        continue
+
                 (artist, title, album) = self._get_track_info(file_path)
                 self._insert_track(-1, '', '', artist, title, album, '', file_path, False)
                 new_files = True
