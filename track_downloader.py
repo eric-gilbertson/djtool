@@ -70,6 +70,7 @@ class TrackDownloader():
             python_path = shutil.which('python3')
             msg = "Python3 not found. Python 3.10+ is required to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
             if python_path:
+                msg = None
                 # get python from shell because tha't what yt-dlp will use.
                 cmd = f'{python_path} --version'
                 self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -81,7 +82,7 @@ class TrackDownloader():
                     python_version = re.sub(r"\\.*", "", python_version)
                     if compare_python_versions(python_version, '3.10') < 0:
                         msg = f"Found Python {python_version} but Python 3.10+ is needed in order to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
-    
+
             if msg:
                 tk.messagebox.showwarning(title="Error", message=msg, parent=self.parent)
                 return

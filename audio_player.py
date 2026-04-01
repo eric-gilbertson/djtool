@@ -36,13 +36,13 @@ class UpdaterThread(threading.Thread):
 
             
 class PlayerThread(threading.Thread):
-    def __init__(self, parent):
+    def __init__(self, parent, pyaudio):
         super(PlayerThread, self).__init__(daemon=True)
         self.parent = parent
         self.track = None
         self.state = PlayerState.STOPPED
         self.start_playback = threading.Event()
-        self.py_audio = pyaudio.PyAudio()
+        self.py_audio = pyaudio
         self.updater = UpdaterThread(self.parent)
         self.updater.start()
 

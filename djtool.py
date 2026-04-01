@@ -60,6 +60,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
 
+        # must be used as a singleton throught app so that new output devices can be found.
+        self.py_audio = pyaudio.PyAudio()
+        self.player = PlayerThread(self, self.py_audio)
+
         self.is_appbundle = getattr(sys, 'frozen', False)
 
         if platform.system() == 'Darwin':
@@ -128,7 +132,6 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self._refresh_output_devices()
         self.set_title()
 
-        self.player = PlayerThread(self)
         self.player.start() 
 
     def on_dock_reopen(self):
@@ -358,28 +361,27 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     # ======================= OUTPUT DEVICES =======================
     def _list_output_devices(self):
-        if pyaudio is None:
-            return []
-        pa = pyaudio.PyAudio()
+        # must reinstantiate in order to see any newly attached devices
+        if not self.player.is_playing():
+            self.py_audio.terminate()
+            self.py_audio = pyaudio.PyAudio()
+
         out = []
         default_output_lc = SystemConfig.output_device.lower()
         default_idx = internal_idx = -1
-        try:
-            out_idx = 0
-            for i in range(pa.get_device_count()):
-                info = pa.get_device_info_by_index(i)
-                if info.get("maxOutputChannels", 0) > 0:
-                    name = info.get("name")
-                    name_lc = name.lower().strip()
-                    if name_lc == default_output_lc:
-                        default_idx = out_idx
-                    elif ("internal" in name_lc) or ("built-in" in name_lc) or ("builtin" in name_lc):
-                        internal_idx = out_idx
+        out_idx = 0
+        for i in range(self.py_audio.get_device_count()):
+            info = self.py_audio.get_device_info_by_index(i)
+            if info.get("maxOutputChannels", 0) > 0:
+                name = info.get("name")
+                name_lc = name.lower().strip()
+                if name_lc == default_output_lc:
+                    default_idx = out_idx
+                elif ("internal" in name_lc) or ("built-in" in name_lc) or ("builtin" in name_lc):
+                    internal_idx = out_idx
 
-                    out.append((i, name))
-                    out_idx = out_idx + 1
-        finally:
-            pa.terminate()
+                out.append((i, name))
+                out_idx = out_idx + 1
 
 
         if default_idx >= 0 or internal_idx >= 0: 
