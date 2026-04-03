@@ -148,7 +148,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.have_focus = False
 
     def _on_close(self):
-        msg = "Quiting now will drop your recent changes. Are you sure that you want to quit?"
+        msg = "Quiting now will drop your recent changes. Changes can be save by clicking File->Save Playlist. Are you sure that you want to quit now?"
         if self.is_dirty and not messagebox.askokcancel("Quit", msg, parent=self):
             return
 
