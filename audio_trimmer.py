@@ -78,7 +78,15 @@ def trim_audio(srcFile):
             return False
         
         saveFile = os.path.dirname(srcFile) + srcpath.stem + ".trim" + srcpath.suffix
+
+        if os.path.exists(srcFile):
+            os.remove(srcFile) # need for Windows
+
         os.rename(tmpFile, srcFile)
+
+        if os.path.exists(tmpFile):
+            print(f"Remove trim file: {tmpFile}");
+            os.remove(tmpFile)
 
     return True
 
