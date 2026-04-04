@@ -39,9 +39,10 @@ class TrackDownloader():
         if not self.YTDL_PATH and parent.is_appbundle:
             self.YTDL_PATH = f"{parent.get_resources_dir()}/helpers/yt-dlp"
 
-        self.FFMPEG_PATH = shutil.which('ffmpeg')
+        FFMPEG_NAME = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
+        self.FFMPEG_PATH = shutil.which(FFMPEG_NAME)
         if not self.FFMPEG_PATH and parent.is_appbundle:
-            self.FFMPEG_PATH = f"{parent.get_resources_dir()}/helpers/ffmpeg"
+            self.FFMPEG_PATH = f"{parent.get_resources_dir()}/helpers/{FFMPEG_NAME}"
 
         logit(f"Helper paths: -{self.YTDL_PATH}-, -{self.FFMPEG_PATH}-")
         self.download_dir = download_dir
@@ -69,6 +70,7 @@ class TrackDownloader():
             python_path = shutil.which('python3')
             msg = "Python3 not found. Python 3.10+ is required to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
             if python_path:
+                msg = None
                 # get python from shell because tha't what yt-dlp will use.
                 cmd = f'{python_path} --version'
                 self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
@@ -80,7 +82,7 @@ class TrackDownloader():
                     python_version = re.sub(r"\\.*", "", python_version)
                     if compare_python_versions(python_version, '3.10') < 0:
                         msg = f"Found Python {python_version} but Python 3.10+ is needed in order to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
-    
+
             if msg:
                 tk.messagebox.showwarning(title="Error", message=msg, parent=self.parent)
                 return
@@ -112,7 +114,7 @@ class TrackDownloader():
                 tk.messagebox.showwarning(title=title, message=message)
 
         if not SystemConfig.user_apikey:
-            message=f'Playlist updating is not available because your User API Key has not been set. Enter your administrator supplied apikey using the File->Configuration dialog. See View->Help for setup help information.'
+            message=f'Live show updating is not available because your User API Key has not been set. Enter your administrator supplied apikey using the File->Configuration dialog. See View->Help for setup help information.'
             tk.messagebox.showwarning(title='Incomplete Setup', message=message)
         elif not SystemConfig.spotify_id or not SystemConfig.spotify_secret:
             msg = '''Spotify features are not available because the Spotify

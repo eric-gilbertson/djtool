@@ -60,6 +60,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     def __init__(self):
         super().__init__()
 
+        # must be used as a singleton throught app so that new output devices can be found.
+        self.py_audio = pyaudio.PyAudio()
+        self.player = PlayerThread(self, self.py_audio)
+
         self.is_appbundle = getattr(sys, 'frozen', False)
 
         if platform.system() == 'Darwin':
@@ -128,7 +132,6 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self._refresh_output_devices()
         self.set_title()
 
-        self.player = PlayerThread(self)
         self.player.start() 
 
     def on_dock_reopen(self):
@@ -145,7 +148,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.have_focus = False
 
     def _on_close(self):
-        msg = "Quiting now will drop your recent changes. Are you sure that you want to quit?"
+        msg = "Quiting now will drop your recent changes. Changes can be save by clicking File->Save Playlist. Are you sure that you want to quit now?"
         if self.is_dirty and not messagebox.askokcancel("Quit", msg, parent=self):
             return
 
@@ -358,28 +361,27 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     # ======================= OUTPUT DEVICES =======================
     def _list_output_devices(self):
-        if pyaudio is None:
-            return []
-        pa = pyaudio.PyAudio()
+        # must reinstantiate in order to see any newly attached devices
+        if not self.player.is_playing():
+            self.py_audio.terminate()
+            self.py_audio = pyaudio.PyAudio()
+
         out = []
         default_output_lc = SystemConfig.output_device.lower()
         default_idx = internal_idx = -1
-        try:
-            out_idx = 0
-            for i in range(pa.get_device_count()):
-                info = pa.get_device_info_by_index(i)
-                if info.get("maxOutputChannels", 0) > 0:
-                    name = info.get("name")
-                    name_lc = name.lower().strip()
-                    if name_lc == default_output_lc:
-                        default_idx = out_idx
-                    elif ("internal" in name_lc) or ("built-in" in name_lc) or ("builtin" in name_lc):
-                        internal_idx = out_idx
+        out_idx = 0
+        for i in range(self.py_audio.get_device_count()):
+            info = self.py_audio.get_device_info_by_index(i)
+            if info.get("maxOutputChannels", 0) > 0:
+                name = info.get("name")
+                name_lc = name.lower().strip()
+                if name_lc == default_output_lc:
+                    default_idx = out_idx
+                elif ("internal" in name_lc) or ("built-in" in name_lc) or ("builtin" in name_lc):
+                    internal_idx = out_idx
 
-                    out.append((i, name))
-                    out_idx = out_idx + 1
-        finally:
-            pa.terminate()
+                out.append((i, name))
+                out_idx = out_idx + 1
 
 
         if default_idx >= 0 or internal_idx >= 0: 
@@ -823,8 +825,18 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
         audio_files = glob.glob(dir_path + "/*.mp3") + glob.glob(dir_path + "/*.wav")
         new_files = False
+        WAV_CHECK_SIZE = 100000000
+        MP3_CHECK_SIZE = 10000000
         for idx, file_path in enumerate(audio_files):
             if not file_path in current_files:
+                file_size = os.path.getsize(file_path)
+                file_ext = extension = pathlib.Path(file_path).suffix
+                if (file_ext == ".mp3" and file_size > MP3_CHECK_SIZE) or file_size > WAV_CHECK_SIZE:
+                    file_name = pathlib.Path(file_path).name
+                    msg = f'File -{file_name}- is very large. Do you want to import it?'
+                    if not messagebox.askyesno("Confirm Operation", msg, parent=self):
+                        continue
+
                 (artist, title, album) = self._get_track_info(file_path)
                 self._insert_track(-1, '', '', artist, title, album, '', file_path, False)
                 new_files = True
