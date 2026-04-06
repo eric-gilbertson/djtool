@@ -1,21 +1,58 @@
 # asynchromously downloads a track using yt-dlp and performs name cleanup on the downloaded file.
 #
-import sys, platform, urllib, stat
-import threading, subprocess, shutil, re, os
+import sys, platform, urllib, stat, ssl, certify
+import threading, subprocess, shutil, re, os, zipfile
 from pathlib import Path
 from tkinter import simpledialog
 import tkinter as tk
 from tkinter import messagebox
+
 from ytmusicapi import YTMusic
 from fuzzy_search import FuzzyYTMusic
-
+#from yt_dlp import YoutubeDL
 
 from audio_trimmer import trim_audio
 from models import Track
-from djutils import logit, compare_python_versions, get_certifi_version, upgrade_certifi
+from djutils import logit
 from system_config import SystemConfig
 
 FIELD_SEPARATOR = '^'
+
+#class YTDLPThread(threading.Thread):
+#    def __init__(self, out_file, track_url, done_callback):
+#        super(YTDLPThread, self).__init__()
+#        self.done_callback = done_callback
+#        self.out_file = out_file
+#        self.track_url = track_url
+#
+#    def run(self):
+#        output_buffer = io.StringIO()
+#        logger = logging.getLogger('yt_dlp_logger')
+#        logger.setLevel(logging.DEBUG)
+#
+#        # 2. Add a handler that writes to the buffer
+#        handler = logging.StreamHandler(output_buffer)
+#        logger.addHandler(handler)
+#        # TODO: add ffmpeg_path
+#        ydl_opts = {
+#            'logger': logger,
+#            'format': 'bestvideo+bestaudio/best',
+#            'outtmpl': self.out_file,
+#            'quiet': False,
+#            'postprocessors': [{
+#                'key': 'FFmpegExtractAudio',
+#                'preferredcodec': 'wav',   # Force conversion to WAV
+#             }],
+#        }
+#
+#        status = -1
+#        with YoutubeDL(ydl_opts) as ydl:
+#            status = ydl.download([self.track_url])
+#            logit(f"download status: {status}")
+#
+#        stdout = str(output_buffer.getvalue())
+#        self.done_callback(status, stdout)
+#        pass
 
 class CommandThread(threading.Thread):
     def __init__(self, cmd, done_callback):
@@ -33,11 +70,13 @@ class CommandThread(threading.Thread):
         pass
 
 class TrackDownloader():
+    YTDL_ALT_PATH_MACOS = os.path.expanduser("~") + "/Library/yt-dlp_macos/yt-dlp_macos"
+     
     def __init__(self, parent, download_dir):
         # use user installed verion if available, else use bundled version if availabe.
         self.YTDL_PATH = shutil.which('yt-dlp')
-        if not self.YTDL_PATH and parent.is_appbundle:
-            self.YTDL_PATH = f"{parent.get_resources_dir()}/helpers/yt-dlp"
+        if not self.YTDL_PATH and platform.system() == 'Darwin' and os.path.exists(self.YTDL_ALT_PATH_MACOS):
+            self.YTDL_PATH = self.YTDL_ALT_PATH_MACOS
 
         FFMPEG_NAME = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
         self.FFMPEG_PATH = shutil.which(FFMPEG_NAME)
@@ -61,57 +100,61 @@ class TrackDownloader():
             os.makedirs(download_dir)
 
 
+    def update_ytdlp(self):
+        logit("Start yt-dlp update")
+
+        if not os.path.exists(self.YTDL_PATH):
+            return f"Yt-dlp path: {self.YTDL_PATH} is invalid. Please reinstall it."
+        else:
+            result = subprocess.run([self.YTDL_PATH, "-U"], capture_output=True, text=True)
+            return str(result.stdout)
+
+    def install_ytdlp_macos(self, install_path):
+        try:
+            install_dir = str(Path(self.YTDL_ALT_PATH_MACOS).parent)
+            if os.path.exists(install_dir):
+                shutil.rmtree(install_dir)
+
+            os.mkdir(install_dir)
+            
+            url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos.zip"
+            context = ssl.create_default_context(cafile=certifi.where())
+            ssl._create_default_https_context = lambda: context
+            zip_path = f"{install_dir}/yt-dlp_macos.zip"
+            urllib.request.urlretrieve(url, zip_path)
+
+            with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                zip_ref.extractall(install_dir)
+
+            current_mode = os.stat(install_path).st_mode
+            os.chmod(install_path, current_mode | stat.S_IXUSR)
+
+            result = subprocess.run([install_path, "--version"], capture_output=True, text=True)
+            if result.returncode == 0:
+                os.remove(zip_path)
+                return str(result.stdout)
+        except Exception as ex:
+            logit("Error installing yt-dlp_macos: {ex")
+
+        return False
+
     def check_dependencies(self):
         msg = None
 
         # only checking on Mac because the Windows version of yt-dlp.exe does
         # not require Python.
-        if platform.system() == 'Darwin':
-            python_path = shutil.which('python3')
-            msg = "Python3 not found. Python 3.10+ is required to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
-            if python_path:
-                msg = None
-                # get python from shell because tha't what yt-dlp will use.
-                cmd = f'{python_path} --version'
-                self.process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-                (stdout, stderr) = self.process.communicate()
-                stdout =  str(stdout)
-                stdout_ar =  str(stdout)
-                if len(stdout_ar) > 1:
-                    python_version = stdout.split()[1]
-                    python_version = re.sub(r"\\.*", "", python_version)
-                    if compare_python_versions(python_version, '3.10') < 0:
-                        msg = f"Found Python {python_version} but Python 3.10+ is needed in order to download songs. It can be obtained from https://www.python.org/downloads/ or through homebrew (Mac) or UniGetUI (Windows). See the directions found under View->Help for more information."
-
-            if msg:
-                tk.messagebox.showwarning(title="Error", message=msg, parent=self.parent)
-                return
-    
-            certifi_version = get_certifi_version(python_path)
-            logit(f'Certifi version -{certifi_version}-')
-            if not certifi_version or certifi_version < '2026.1.1':
-                msg = f'The certifi package version -{certifi_version}-, does not support song downloading. Would you like to install/upgrade it so that you can download music?'
-                doit = tk.messagebox.askokcancel(title="Invalid Certifi Version", message=msg, parent=self.parent)
-                if doit:
-                    if not upgrade_certifi(python_path):
-                        msg = f'An error occurred while installing certifi'
-
-
-        if not self.YTDL_PATH:
-            doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now? (Alternatively, you can install it manually per the instructions in the Vew->Help page)?', parent=self.parent)
+        if platform.system() == 'Darwin' and not self.YTDL_PATH:
+            doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now (this will take around 30 seconds to complete)? Alternatively, you can install it manually per the instructions in the Vew->Help page.', parent=self.parent)
             if doit:
-                self.install_ytdlp()
-
-                title = "Success"
-                if not self.YTDL_PATH:
+                version = self.install_ytdlp_macos(self.YTDL_ALT_PATH_MACOS)
+                if version:
+                    message = f"Yt-dlp {version} was installed at {self.YTDL_ALT_PATH_MACOS}"
+                    self.YTDL_PATH = self.YTDL_ALT_PATH_MACOS
+                else:
                     title = "Error"
                     message='Yt-dlp was not installed. See the log using View->Log file for more informaton.'
-                elif self.YTDL_PATH == self.ALT_YTDL_PATH:
-                    message=f'Yt-dlp application was downloaded to {self.YTDL_PATH}. This will work but recommend that you copy the system folder by executing "sudo mv ~/Downloads/yt-dlp /usr/local/bin" from a terminal and then restarting DJTool'
-                else:
-                    message=f'Yt-dlp has been installed to {self.YTDL_PATH}'
 
-                tk.messagebox.showwarning(title=title, message=message)
+                tk.messagebox.showwarning(title="Yt-dlp Status", message=message)
 
         if not SystemConfig.user_apikey:
             message=f'Live show updating is not available because your User API Key has not been set. Enter your administrator supplied apikey using the File->Configuration dialog. See View->Help for setup help information.'
@@ -185,7 +228,6 @@ class TrackDownloader():
     def on_fetch_done(self):
         self.err_msg = str(self.download_thread.stderr)
         stdOut = self.download_thread.stdout.decode('UTF-8')
-
         if self.err_msg.find('File name too long') > 0:
             self.name_too_long = True
         elif self.download_thread.process.returncode == 0:
@@ -206,27 +248,6 @@ class TrackDownloader():
         self.is_done = True
 
 
-    # TODO: fix for Windows
-    def install_ytdlp(self):
-        url = "http://kzsu.stanford.edu/djtool/download?filename=yt-dlp"
-        try:
-            download_path = self.ALT_YTDL_PATH
-            logit(f"start yt-dlp download to {download_path}")
-            urllib.request.urlretrieve(url, download_path)
-            st = os.stat(download_path)
-            os.chmod(download_path, st.st_mode | stat.S_IEXEC)
-            target_path = '/usr/local/bin/yt-dlp'
-            if os.access(os.path.dirname(target_path), os.W_OK):
-                logit(f"move yt-dlp to {target_path}")
-                shutil.move(download_path, target_path)
-                self.YTDL_PATH = target_path
-            else:
-                self.YTDL_PATH = download_path
-            return True
-        except Exception as ex:
-            logit(f"Exception while downloading yt-dlp: {ex}")
-            return False
-            
     # normalizes files downloaded from YT & MPE into standard <ARTIST>^<TITLE> name format.
     @staticmethod
     def clean_filepath(filepath):

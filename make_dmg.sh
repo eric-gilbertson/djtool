@@ -1,8 +1,9 @@
 #!/bin/bash
 
+set -e
+
 APP_NAME="DJTool"
 SCRIPT_NAME="djtool.py"
-YTDLP_PATH="/usr/local/bin/yt-dlp"
 FFMPEG_PATH="/usr/local/bin/ffmpeg"
 
 if [[ -z $VIRTUAL_ENV ]]; then
@@ -11,11 +12,23 @@ if [[ -z $VIRTUAL_ENV ]]; then
 fi
 
 rm -rf dist/*
-pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "$YTDLP_PATH:helpers" --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
+pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
+
+#pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-binary "yt-dlp_macos:yt-dlp_macos" --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
 
 rm -rf dist/djtool
 
+if [ $? -ne 0 ]; then
+    echo "Pyinstaller failed"
+    exit 1
+fi
+
 create-dmg --icon "DJTool.app" 100 60  --app-drop-link 250  60   "dist/DJTool.dmg" ./dist
+
+if [ $? -ne 0 ]; then
+    echo "Pyinstaller failed"
+    exit 1
+fi
 
 scp dist/DJTool.dmg ericg@kzsu.stanford.edu:/media/kzsu-audio-archive1/kzsu-aircheck-archives/featured_programs
 

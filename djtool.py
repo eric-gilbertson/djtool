@@ -235,6 +235,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         filemenu.add_command(label="ClearPlaylist...", command=self.clear_playlist)
         filemenu.add_command(label="Import Audio...", command=self.import_audio_files)
         filemenu.add_command(label="Save MP3...", command=self.save_mp3)
+        filemenu.add_command(label="Update yt-dlp", command=self.update_ytdlp)
         menubar.add_cascade(label="File", menu=filemenu)
 
         editmenu = tk.Menu(menubar, tearoff=0)
@@ -732,6 +733,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         return shlex.split(normalized)
 
     # ======================= PLAYLIST SAVE/LOAD =======================
+    def update_ytdlp(self):
+        status = self.downloader.update_ytdlp()
+        tk.messagebox.showwarning(title="YT-DLP Update", message=status)
+
     def save_mp3(self):
         if not shutil.which("ffmpeg"):
             tk.messagebox.showwarning(title="Error", message='ffmpeg is required for this operation.', parent=self)
