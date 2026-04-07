@@ -1,6 +1,6 @@
 # asynchromously downloads a track using yt-dlp and performs name cleanup on the downloaded file.
 #
-import sys, platform, urllib, stat, ssl, certify
+import sys, platform, urllib, stat, ssl, certifi
 import threading, subprocess, shutil, re, os, zipfile
 from pathlib import Path
 from tkinter import simpledialog
