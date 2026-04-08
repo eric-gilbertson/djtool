@@ -228,22 +228,28 @@ class TrackDownloader():
     def on_fetch_done(self):
         self.err_msg = str(self.download_thread.stderr)
         stdOut = self.download_thread.stdout.decode('UTF-8')
+        self.errMsg = ''
+
         if self.err_msg.find('File name too long') > 0:
             self.name_too_long = True
         elif self.download_thread.process.returncode == 0:
             idx1 = stdOut.rfind("Destination: ") + 13
             idx2 = stdOut.find(".wav", idx1)
             if idx1 > 13 and idx2 > idx1:
-                self.errMsg = ''
                 self.download_file =  stdOut[idx1:idx2+4]
                 logit("Downloaded file: " + self.download_file)
-                (self.track.file_path, file_artist, file_title)  = self.clean_filepath(self.download_file)
-                # use the title/artist from the downloaded iff it has not already been set.
-                self.track.artist = self.track.artist if self.track.artist else file_artist
-                self.track.title = self.track.title if self.track.title else file_title
-                trim_audio(self.track.file_path)
+                if os.path.exists(self.download_file):
+                    (self.track.file_path, file_artist, file_title)  = self.clean_filepath(self.download_file)
+                    # use the title/artist from the downloaded iff it has not already been set.
+                    self.track.artist = self.track.artist if self.track.artist else file_artist
+                    self.track.title = self.track.title if self.track.title else file_title
+                    if not trim_audio(self.track.file_path):
+                        self.errMsg = f"Format error in download file: -{self.download_file}-"
+                else:
+                    self.errMsg = f"Download file does not exist -{self.download_file}-"
         else:
             logit(f"yt-dlp download error: {stdOut}, {self.err_msg}")
+            self.errMsg = self.err_msg
 
         self.is_done = True
 
