@@ -1,5 +1,7 @@
 # asynchromously downloads a track using yt-dlp and performs name cleanup on the downloaded file.
 #
+import io
+import logging
 import sys, platform, urllib, stat, ssl, certifi
 import threading, subprocess, shutil, re, os, zipfile
 from pathlib import Path
@@ -9,7 +11,7 @@ from tkinter import messagebox
 
 from ytmusicapi import YTMusic
 from fuzzy_search import FuzzyYTMusic
-#from yt_dlp import YoutubeDL
+from yt_dlp import YoutubeDL
 
 from audio_trimmer import trim_audio
 from models import Track
@@ -18,56 +20,58 @@ from system_config import SystemConfig
 
 FIELD_SEPARATOR = '^'
 
-#class YTDLPThread(threading.Thread):
-#    def __init__(self, out_file, track_url, done_callback):
-#        super(YTDLPThread, self).__init__()
-#        self.done_callback = done_callback
-#        self.out_file = out_file
-#        self.track_url = track_url
-#
-#    def run(self):
-#        output_buffer = io.StringIO()
-#        logger = logging.getLogger('yt_dlp_logger')
-#        logger.setLevel(logging.DEBUG)
-#
-#        # 2. Add a handler that writes to the buffer
-#        handler = logging.StreamHandler(output_buffer)
-#        logger.addHandler(handler)
-#        # TODO: add ffmpeg_path
-#        ydl_opts = {
-#            'logger': logger,
-#            'format': 'bestvideo+bestaudio/best',
-#            'outtmpl': self.out_file,
-#            'quiet': False,
-#            'postprocessors': [{
-#                'key': 'FFmpegExtractAudio',
-#                'preferredcodec': 'wav',   # Force conversion to WAV
-#             }],
-#        }
-#
-#        status = -1
-#        with YoutubeDL(ydl_opts) as ydl:
-#            status = ydl.download([self.track_url])
-#            logit(f"download status: {status}")
-#
-#        stdout = str(output_buffer.getvalue())
-#        self.done_callback(status, stdout)
-#        pass
+# downloads using the python library
+class YTDLPThread(threading.Thread):
+    def __init__(self, out_file, track_url, done_callback):
+        super(YTDLPThread, self).__init__()
+        self.done_callback = done_callback
+        self.out_file = out_file
+        self.track_url = track_url
 
+    def run(self):
+        output_buffer = io.StringIO()
+        logger = logging.getLogger('yt_dlp_logger')
+        logger.setLevel(logging.DEBUG)
+
+        # 2. Add a handler that writes to the buffer
+        handler = logging.StreamHandler(output_buffer)
+        logger.addHandler(handler)
+        # TODO: add ffmpeg_path
+        ydl_opts = {
+            'logger': logger,
+            'format': 'bestvideo+bestaudio/best',
+            'outtmpl': self.out_file,
+            'quiet': False,
+            'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'wav',   # Force conversion to WAV
+             }],
+        }
+
+        status = -1
+        with YoutubeDL(ydl_opts) as ydl:
+            status = ydl.download([self.track_url])
+            logit(f"download status: {status}")
+
+        stdout = str(output_buffer.getvalue())
+        self.done_callback(status, stdout)
+        pass
+
+# downloads using external yt-dlp binary
 class CommandThread(threading.Thread):
     def __init__(self, cmd, done_callback):
         super(CommandThread, self).__init__()
         self.done_callback = done_callback
         self.cmd = cmd
-        self.process = None
-        self.stdout = None
-        self.stderr = None
 
     def run(self):
-        self.process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
-        (self.stdout, self.stderr) = self.process.communicate()
-        self.done_callback()
+        process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
+        (stdout, stderr) = process.communicate()
+        # merging them because that's what the API versiond does.
+        ret_msg = stderr.decode('UTF-8') + "\n" +stdout.decode('UTF-8')
+        self.done_callback(process.returncode, ret_msg)
         pass
+
 
 class TrackDownloader():
     YTDL_ALT_PATH_MACOS = os.path.expanduser("~") + "/Library/yt-dlp_macos/yt-dlp_macos"
@@ -103,11 +107,28 @@ class TrackDownloader():
     def update_ytdlp(self):
         logit("Start yt-dlp update")
 
-        if not os.path.exists(self.YTDL_PATH):
-            return f"Yt-dlp path: {self.YTDL_PATH} is invalid. Please reinstall it."
+        # only checking on Mac because the Windows version of yt-dlp.exe does
+        # not require Python.
+        message = "UNKNOWN"
+        if platform.system() == 'Darwin' and not self.YTDL_PATH:
+            doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now (this will take around 30 seconds to complete)? Alternatively, you can install it manually per the instructions in the Vew->Help page.', parent=self.parent)
+            if doit:
+                version = self.install_ytdlp_macos(self.YTDL_ALT_PATH_MACOS)
+                if version:
+                    message = f"Yt-dlp {version} was installed at {self.YTDL_ALT_PATH_MACOS}"
+                    self.YTDL_PATH = self.YTDL_ALT_PATH_MACOS
+                else:
+                    title = "Error"
+                    message='Yt-dlp was not installed. See the log using View->Log file for more informaton.'
+            else:
+                return
+        elif not os.path.exists(self.YTDL_PATH):
+            message =  f"Yt-dlp path: {self.YTDL_PATH} is invalid. Please reinstall it."
         else:
             result = subprocess.run([self.YTDL_PATH, "-U"], capture_output=True, text=True)
-            return str(result.stdout)
+            message =  str(result.stdout)
+
+        tk.messagebox.showwarning(title="Yt-dlp Status", message=message)
 
     def install_ytdlp_macos(self, install_path):
         try:
@@ -134,28 +155,14 @@ class TrackDownloader():
                 os.remove(zip_path)
                 return str(result.stdout)
         except Exception as ex:
-            logit("Error installing yt-dlp_macos: {ex")
+            logit(f"Error installing yt-dlp_macos: {ex}")
 
         return False
 
-    def check_dependencies(self):
+    @staticmethod
+    def check_dependencies():
         msg = None
-
-        # only checking on Mac because the Windows version of yt-dlp.exe does
-        # not require Python.
-        if platform.system() == 'Darwin' and not self.YTDL_PATH:
-            doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now (this will take around 30 seconds to complete)? Alternatively, you can install it manually per the instructions in the Vew->Help page.', parent=self.parent)
-            if doit:
-                version = self.install_ytdlp_macos(self.YTDL_ALT_PATH_MACOS)
-                if version:
-                    message = f"Yt-dlp {version} was installed at {self.YTDL_ALT_PATH_MACOS}"
-                    self.YTDL_PATH = self.YTDL_ALT_PATH_MACOS
-                else:
-                    title = "Error"
-                    message='Yt-dlp was not installed. See the log using View->Log file for more informaton.'
-
-                tk.messagebox.showwarning(title="Yt-dlp Status", message=message)
-
+    
         if not SystemConfig.user_apikey:
             message=f'Live show updating is not available because your User API Key has not been set. Enter your administrator supplied apikey using the File->Configuration dialog. See View->Help for setup help information.'
             tk.messagebox.showwarning(title='Incomplete Setup', message=message)
@@ -163,30 +170,24 @@ class TrackDownloader():
             msg = '''Spotify features are not available because the Spotify
                  apikeys have not been set. Check that your user key in the File->Configuration
                  dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
-
+    
             tk.messagebox.showwarning("Configuration Error", msg)
         elif not SystemConfig.genius_apikey:
             msg = '''The FCC check feature is not available because the Genius
                  apikey has not been set. Check that your user key in the File->Configuration
                  dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
-
+    
             tk.messagebox.showwarning("Configuration Error", msg)
-
 
     def fetch_track(self, parent, track_specifier, use_fullname):
         logit(f"Enter fetch_track: {track_specifier}")
         is_url = 'https:/' in track_specifier
         ARTIST_TRACK_SEPARATOR = r' - |;|\t' # split on -, ; and <tab>
         artistTerm = '%(artist)s' if use_fullname  else 'UNKNOWN'
-        out_file = '"{}/{}_%(title)s.%(ext)s"'.format(self.download_dir, artistTerm)
         self.track.reset()
         track_specifier_ar = re.split(ARTIST_TRACK_SEPARATOR, track_specifier)
         error_msg = '''Invalid song request. Enter either <ARTIST_NAME><SEPERATOR><SONG_TITLE> using -, ; or <TAB> as the artist/title separator or a YouTube song URL. Note that the artist and song values do not have to be complete, e.g. "Stones ; Satisfaction"  and that one of the values may be empty, e.g. use "Beatles;" to locate Beatles songs or ";Hallelujah" to find cover versions of that song. All entry values correctly spelled.'''
         
-        if not self.YTDL_PATH:
-            tk.messagebox.showwarning(title='Error', message='The yt-dlp application was not found. Please install it per the directions in the View->Help page', parent=self.parent)
-            return False
-
         if not is_url and len(track_specifier_ar) <  2:
             tk.messagebox.showwarning(title="Error", message=error_msg, parent=self.parent)
             return False
@@ -217,25 +218,31 @@ class TrackDownloader():
             tk.messagebox.showwarning(title="Error", message=error_msg, parent=self.parent)
             return False
 
-        # passing in ffmpeg location because it may not be in the user's PATH
-        cmd = f'{self.YTDL_PATH} --ffmpeg-location {self.FFMPEG_PATH} --extract-audio --audio-format wav -o {out_file} {self.track_url}'
         self.is_done = False
-        logit(f"Start download: {cmd}")
-        self.download_thread = CommandThread(cmd, self.on_fetch_done)
-        self.download_thread.start()
+        if self.YTDL_PATH:
+            # passing in ffmpeg location because it may not be in the user's PATH
+            out_file = '"{}/{}_%(title)s.%(ext)s"'.format(self.download_dir, artistTerm)
+            cmd = f'{self.YTDL_PATH} --ffmpeg-location {self.FFMPEG_PATH} --extract-audio --audio-format wav -o {out_file} {self.track_url}'
+            logit(f"Start external download: {cmd}")
+            self.download_thread = CommandThread(cmd, self.on_fetch_done)
+            self.download_thread.start()
+        else:
+            # NOTE: no ext here, the extension will be set by the library
+            out_file = '{}/{}_%(title)s'.format(self.download_dir, artistTerm)
+            logit(f"Start internal download: {self.track_url}, {out_file}")
+            self.download_thread = YTDLPThread(out_file, self.track_url, self.on_fetch_done)
+            self.download_thread.start()
+
         return True
 
-    def on_fetch_done(self):
-        self.err_msg = str(self.download_thread.stderr)
-        stdOut = self.download_thread.stdout.decode('UTF-8')
-        self.errMsg = ''
-
-        if self.err_msg.find('File name too long') > 0:
+    def on_fetch_done(self, returnCode, stdOut):
+        if stdOut.find('File name too long') > 0:
             self.name_too_long = True
-        elif self.download_thread.process.returncode == 0:
+        elif returnCode == 0:
             idx1 = stdOut.rfind("Destination: ") + 13
             idx2 = stdOut.find(".wav", idx1)
             if idx1 > 13 and idx2 > idx1:
+                self.errMsg = ''
                 self.download_file =  stdOut[idx1:idx2+4]
                 logit("Downloaded file: " + self.download_file)
                 if os.path.exists(self.download_file):
@@ -248,8 +255,7 @@ class TrackDownloader():
                 else:
                     self.errMsg = f"Download file does not exist -{self.download_file}-"
         else:
-            logit(f"yt-dlp download error: {stdOut}, {self.err_msg}")
-            self.errMsg = self.err_msg
+            logit(f"yt-dlp download error: {stdOut}")
 
         self.is_done = True
 
