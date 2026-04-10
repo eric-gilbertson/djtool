@@ -188,16 +188,18 @@ class ZKPlaylist():
 
     def send_track(self, track):
         print(f"enter send_track {track.title}")
-        if not self.id or not self._is_active() or track.is_pause_file() or track.title.startswith("LID_"):
+        apikey = UserConfiguration.user_apikey
+        playlistkey = UserConfiguration.playlist_apikey
+        if not self.id or not self._is_active() or track.is_pause_file() or track.title.startswith("LID_") or not apikey or not playlistkey:
             logit(f"skip send_track {self.id}, {self._is_active()}")
             return
 
         print(f"do send_track {track.title}")
         url = SystemConfig.playlist_host + f'/djtool/addtrack/'
-        apikey = SystemConfig.user_apikey
         event_type = 'break' if track.is_mic_break_file() else 'spin'
         data =  {
                 "id": self.id,
+                "playlist-apikey": playlistkey,
                 "type": event_type,
                 "created": "auto",
                 "artist": track.artist,
@@ -220,9 +222,10 @@ class ZKPlaylist():
 
 
     def check_show_playlist(self, target_title):
-        apikey = SystemConfig.user_apikey
-        if not apikey:
-            tk.messagebox.showwarning("Missing User Key", "The User API Key must be set using File->Configuration in order to use this feature.")
+        apikey = UserConfiguration.user_apikey
+        playlist_apikey = UserConfiguration.playlist_apikey
+        if not apikey or not playlist_apikey:
+            tk.messagebox.showwarning("Missing API Key", "The user and playlist API keys must be set to user this feature. Contact your system administrator for help on these keys.")
             return False
 
         self.id = None
@@ -260,7 +263,6 @@ class ZKPlaylist():
     def check_show_playlist_zookeeper(self, target_title):
         self.id = None
         now_date = datetime.datetime.now().date().isoformat()
-        now_date = '2026-01-31'  ##############
         url = SystemConfig.zookeeper_host + f'/api/v2/playlist?filter[date]={now_date}'
 
         try:
@@ -296,6 +298,7 @@ class UserConfiguration():
     show_start_time = ''
     playlist_host = ''
     user_apikey = ''
+    playlist_apikey = ''
 
     @staticmethod
     def load_config():
@@ -310,13 +313,15 @@ class UserConfiguration():
         UserConfiguration.show_start_time = config_dict.get('show_start_time', '')
         UserConfiguration.playlist_host = config_dict.get('playlist_host', '')
         UserConfiguration.user_apikey = config_dict.get('user_apikey', '')
+        UserConfiguration.playlist_apikey = config_dict.get('playlist_apikey', '')
 
     @staticmethod
     def save_config():
         data = {
             "show_title" : UserConfiguration.show_title,
             "show_start_time": UserConfiguration.show_start_time,
-            "user_apikey": UserConfiguration.user_apikey
+            "user_apikey": UserConfiguration.user_apikey,
+            "playlist_apikey": UserConfiguration.playlist_apikey
         }
         yaml_string = yaml.dump(data, sort_keys=False)
 
