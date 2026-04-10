@@ -139,14 +139,16 @@ class UserConfigurationDialog(simpledialog.Dialog):
         super().__init__(parent, "Configuration")
 
     def body(self, master):
-        tk.Label(master, text="Show Title:").grid(row=0, column=0, sticky="e", padx=5, pady=5)
+        row_num = 0
+        tk.Label(master, text="Show Title:").grid(row=row_num, column=0, sticky="e", padx=5, pady=5)
         self.show_title_entry = tk.Entry(master, width=40)
         self.show_title_entry.insert(0, UserConfiguration.show_title)
-        self.show_title_entry.grid(row=0, column=1, padx=5, pady=5)
+        self.show_title_entry.grid(row=row_num, column=1, padx=5, pady=5)
 
-        tk.Label(master, text="Show Start:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        row_num = row_num + 1
+        tk.Label(master, text="Show Start:").grid(row=row_num, column=0, sticky="e", padx=5, pady=5)
         self.show_start_combo = ttk.Combobox(master, state="readonly", width=15)
-        self.show_start_combo.grid(row=1, column=1, sticky='w', padx=5, pady=5)
+        self.show_start_combo.grid(row=row_num, column=1, sticky='w', padx=5, pady=5)
         time_values = [
             '12 am', '1 am', '2 am', '3 am', '4 am', '5 am', '6 am', '7 am', '8 am', '9 am', '10 am', '11 am',
             '12 pm', '1 pm', '2 pm', '3 pm', '4 pm', '5 pm', '6 pm', '7 pm', '8 pm', '9 pm', '10 pm', '11 pm',
@@ -160,20 +162,34 @@ class UserConfigurationDialog(simpledialog.Dialog):
             hour = hour + 12 if time_ar[1] == 'pm' and hour != 12 else hour
             self.show_start_combo.set(time_values[hour])
 
-        tk.Label(master, text="User API Key:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
-        self.apikey_entry = tk.Entry(master, width=40)
-        self.apikey_entry.insert(0, UserConfiguration.user_apikey)
-        self.apikey_entry.grid(row=2, column=1, padx=5, pady=5)
+        row_num = row_num + 1
+        tk.Label(master, text="User API Key:").grid(row=row_num, column=0, sticky="e", padx=5, pady=5)
+        self.user_apikey_entry = tk.Entry(master, width=40)
+        self.user_apikey_entry.insert(0, UserConfiguration.user_apikey)
+        self.user_apikey_entry.grid(row=row_num, column=1, padx=5, pady=5)
+
+        row_num = row_num + 1
+        tk.Label(master, text="Zookeeper API Key:").grid(row=row_num, column=0, sticky="e", padx=5, pady=5)
+        self.playlist_apikey_entry = tk.Entry(master, width=40)
+        self.playlist_apikey_entry.insert(0, UserConfiguration.playlist_apikey)
+        self.playlist_apikey_entry.grid(row=row_num, column=1, padx=5, pady=5)
 
         return self.show_title_entry  # focus on artist field by default
 
     def validate(self):
-        keylen = len(self.apikey_entry.get())
-        is_okay = keylen == 0 or keylen == 32
-        if not is_okay:
-            tk.messagebox.showwarning(title="Error", message='The length of the User API Key entry is incorrect. This value should be 40 characters long.', parent=self)
+        API_KEY_LEN = 40
 
-        return is_okay
+        keylen1 = len(self.user_apikey_entry.get())
+        is_okay1 = keylen1 == 0 or keylen1 == API_KEY_LEN
+        if not is_okay1:
+            tk.messagebox.showwarning(title="Error", message=f'The length of the User API Key entry is incorrect. This value should be {API_KEY_LEN} characters long.', parent=self)
+
+        keylen2 = len(self.playlist_apikey_entry.get())
+        is_okay2 = keylen2 == 0 or keylen2 == API_KEY_LEN
+        if not is_okay2:
+            tk.messagebox.showwarning(title="Error", message=f'The length of the Playlist API Key entry is incorrect. This value should be {API_KEY_LEN}  characters long.', parent=self)
+
+        return is_okay1 and is_okay2
 
 
     def apply(self):
@@ -181,7 +197,8 @@ class UserConfigurationDialog(simpledialog.Dialog):
         update_system_apikey = SystemConfig.user_apikey == UserConfiguration.user_apikey
 
         UserConfiguration.show_title = self.show_title_entry.get()
-        UserConfiguration.user_apikey = self.apikey_entry.get()
+        UserConfiguration.user_apikey = self.user_apikey_entry.get()
+        UserConfiguration.playlist_apikey = self.playlist_apikey_entry.get()
         UserConfiguration.show_start_time = self.show_start_combo.get()
 
         # update iff using the user key as the system key.
