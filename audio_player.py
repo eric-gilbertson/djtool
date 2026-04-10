@@ -71,40 +71,65 @@ class PlayerThread(threading.Thread):
             self.play_audio()
 
     def play_audio(self):
+        samplerate = 48000
+        channels = 2
+        block_size = 4096
+
         self.start_playback.clear()
         self.state = PlayerState.PLAYING
-
+        device_index = self.parent._get_selected_device_index()
+        self.updater.start_countdown(total/1000)
         while self.is_playing() and self.track:
             try:
                 self.parent.prepare_track_for_playback(self.track)
                 if self.track.is_stop_file():
                     break
 
-                audio_segment = AudioSegment.from_file(self.track.file_path)
-                kwargs = dict(
-                    format=self.py_audio.get_format_from_width(audio_segment.sample_width),
-                    channels=audio_segment.channels, rate=audio_segment.frame_rate,
-                    frames_per_buffer=4096, output=True,
+                ffmpeg_process = subprocess.Popen(
+                    [
+                        "ffmpeg",
+                        "-loglevel", "error",
+                        "-probesize", "32k",
+                        "-analyzeduration", "0",
+                        "-i", self.track.file_path,
+                        "-f", "f32le",
+                        "-acodec", "pcm_f32le",
+                        "-ac", str(channels),
+                        "-ar", str(samplerate),
+                        "-"
+                    ],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    bufsize=10**6
                 )
-                dev_index = self.parent._get_selected_device_index()
-                if dev_index is not None:
-                    kwargs["output_device_index"] = dev_index
+            
+                stream = sd.OutputStream(
+                    samplerate=samplerate,
+                    channels=channels,
+                    dtype='float32',
+                    blocksize=block_size,
+                    device=device_index
+                )
+            
+                bytes_per_frame = channels * 4
+            
+                with stream:
+                    while self.is_playing():
+                        data = ffmpeg_process.stdout.read(block_size * bytes_per_frame)
+            
+                        if not data:
+                            if ffmpeg_process.poll() is not None:
+                                err = ffmpeg_process.stderr.read().decode()
+                                if err:
+                                    print("FFmpeg error:", err)
+                                break
+                            continue
+            
+                        audio = np.frombuffer(data, dtype=np.float32).reshape(-1, channels)
+                        stream.write(audio)
 
-                stream = self.py_audio.open(**kwargs)
-                chunk_ms = 50  # smooth, low-latency
-                pos = 0
-                total = len(audio_segment)
-                self.updater.start_countdown(total/1000)
-
-                while pos < total and self.is_playing():
-                    nxt = min(pos + chunk_ms, total)
-                    chunk = audio_segment[pos:nxt]
-                    stream.write(chunk.raw_data)
-                    pos = nxt
-
-                stream.stop_stream()
-                stream.close()
                 self.updater.stop_event.set()
+                stream.close()
             except Exception as ex:
                 logit(f"Playback error: {ex}")
 
@@ -112,7 +137,4 @@ class PlayerThread(threading.Thread):
                 self.track = self.parent.get_next_track_for_playback(self.track.id)
         
         self.state = PlayerState.STOPPED
-
-
-
 

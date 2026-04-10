@@ -662,7 +662,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         file_count = len(files) - 1
         for path in files:
             path = path.strip()
-            if not path or not path.lower().endswith((".mp3", ".wav")) or not os.path.isfile(path):
+            if not path or not path.lower().endswith((".mp3", ".wav", ".opus")) or not os.path.isfile(path):
                 tk.messagebox.showwarning(title="Error", message=f'Ignoring invalid file:" {path}', parent=self)
                 continue
 
@@ -786,6 +786,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 audio = AudioSegment.from_mp3(track.file_path)
             elif track.file_path.endswith('.wav') and os.path.exists(track.file_path):
                 audio = AudioSegment.from_wav(track.file_path)
+            elif track.file_path.endswith('.opus') and os.path.exists(track.file_path):
+                audio = AudioSegment.from_file(track.file_path, format="ogg")
             else:
                 skip_msg = f"Skipping missing or unsupported file: {track.file_path}"
                 logit(skip_msg)
@@ -824,7 +826,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         for track in self.tree_datamap.values():
             current_files.append(track.file_path)
 
-        audio_files = glob.glob(dir_path + "/*.mp3") + glob.glob(dir_path + "/*.wav")
+        audio_files = glob.glob(dir_path + "/*.mp3") +  \
+                      glob.glob(dir_path + "/*.wav") + \
+                      glob.glob(dir_path + "/*.opus")
         new_files = False
         WAV_CHECK_SIZE = 100000000
         MP3_CHECK_SIZE = 10000000
@@ -832,7 +836,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             if not file_path in current_files:
                 file_size = os.path.getsize(file_path)
                 file_ext = extension = pathlib.Path(file_path).suffix
-                if (file_ext == ".mp3" and file_size > MP3_CHECK_SIZE) or file_size > WAV_CHECK_SIZE:
+                if ((file_ext == ".mp3" or file_ext == ".opus") and file_size > MP3_CHECK_SIZE) or file_size > WAV_CHECK_SIZE:
                     file_name = pathlib.Path(file_path).name
                     msg = f'File -{file_name}- is very large. Do you want to import it?'
                     if not messagebox.askyesno("Confirm Operation", msg, parent=self):
