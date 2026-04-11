@@ -187,10 +187,13 @@ class ZKPlaylist():
         end_time = time.time_ns()
 
     def send_track(self, track):
+        if not self.id:
+            return # funcion is disabled
+
         print(f"enter send_track {track.title}")
         apikey = UserConfiguration.user_apikey
         playlistkey = UserConfiguration.playlist_apikey
-        if not self.id or not self._is_active() or track.is_pause_file() or track.title.startswith("LID_") or not apikey or not playlistkey:
+        if not self._is_active() or track.is_pause_file() or track.title.startswith("LID_") or not apikey or not playlistkey:
             logit(f"skip send_track {self.id}, {self._is_active()}")
             return
 

@@ -1,7 +1,10 @@
+import subprocess
 import threading, time, pyaudio
 from enum import Enum
 from pydub import AudioSegment
 from djutils import logit
+import sounddevice as sd
+import numpy as np
 
 class PlayerState(Enum):
     STOPPED = 1
@@ -78,7 +81,7 @@ class PlayerThread(threading.Thread):
         self.start_playback.clear()
         self.state = PlayerState.PLAYING
         device_index = self.parent._get_selected_device_index()
-        self.updater.start_countdown(total/1000)
+
         while self.is_playing() and self.track:
             try:
                 self.parent.prepare_track_for_playback(self.track)
@@ -112,7 +115,8 @@ class PlayerThread(threading.Thread):
                 )
             
                 bytes_per_frame = channels * 4
-            
+                self.updater.start_countdown(self.track.duration)
+
                 with stream:
                     while self.is_playing():
                         data = ffmpeg_process.stdout.read(block_size * bytes_per_frame)

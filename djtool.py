@@ -234,7 +234,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         filemenu.add_command(label="Update Playlist", accelerator = '⌘-s', command=self.update_playlist)
         filemenu.add_command(label="ClearPlaylist...", command=self.clear_playlist)
         filemenu.add_command(label="Import Audio...", command=self.import_audio_files)
-        filemenu.add_command(label="Save MP3...", command=self.save_mp3)
+        filemenu.add_command(label="Export MP3...", command=self.save_mp3)
         filemenu.add_command(label="Update yt-dlp", command=self.downloader.update_ytdlp)
         menubar.add_cascade(label="File", menu=filemenu)
 
@@ -244,6 +244,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         editmenu.add_command(label="Insert Pause", command=self.insert_pause)
         editmenu.add_command(label="Insert Mic-Break", command=self.insert_mic_break)
         editmenu.add_command(label="FCC Check", command=self.fcc_check)
+        editmenu.add_command(label="FCC Clear...", command=self.fcc_set_unknown_to_safe)
         menubar.add_cascade(label="Edit", menu=editmenu)
 
         viewmenu = tk.Menu(menubar, tearoff=0)
@@ -800,6 +801,17 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         logit(f"done mp3 export {filename}")
         tk.messagebox.showwarning(title="MP3 File Saved", message=f'Playlist saved as {filename}', parent= self)
 
+    def fcc_set_unknown_to_safe(self):
+        msg = '''Would you like set all tracks with unknown FCC status (yellow) to safe (green)?'''
+        if messagebox.askyesno("Confirm Operation", msg, parent=self):
+            for track in self.tree_datamap.values():
+                if track.fcc_status == 'NOT_FOUND':
+                    logit(f"set {track.title} to FCC clean")
+                    track.fcc_status = FCCChecker.FCC_STATUS_AR[0]
+                    row_values = self.tree.item(track.id)["values"]
+                    row_values = (*row_values[0:5], track.fcc_status_glyph())
+                    self.tree.item(track.id, values=row_values)
+
     def fcc_check(self):
         if SystemConfig.check_have_genius_key():
             for track in self.tree_datamap.values():
@@ -1010,12 +1022,14 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 idx = 1
                 for track_obj in track_objs:
                     track = Track.from_dict(track_obj)
-                    if track:
+                    if track and track.duration == 0 or os.path.exists(track.file_path):
                         track_start = HMS_from_seconds(total_secs)
                         track.id = self.tree.insert("", "end", values=(idx, track_start, track.artist, track.title, track.album, track.fcc_status_glyph()))
                         self.tree_datamap[track.id] = track
                         total_secs = total_secs + track.duration
                         idx = idx + 1
+                    elif track:
+                        logit(f"Skipping track, missing file: {track.file_path}")
     
             logit(f"Imported {idx} tracks.")
         except Exception as e:

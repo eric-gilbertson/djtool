@@ -83,7 +83,11 @@ Unlike the save operation, which prompts for a new playlist name, the update ope
 
 
 <h2> Explicit Language Checking</h2>
-Playlist tracks can be checked for the presence of FCC language violations with the File->FCC Check link.This operation checks Spotify's explicit status for the track as well as the presence of fuck and shit in the track lyrics and assigning one of the following values to each track: CLEAN, DIRTY, NOT_FOUND.
+Playlist tracks can be checked for the presence of FCC language violations with the File->FCC Check function.This operation searches for song lyrics and checking them for offensive words and assigns one of the following values to each track: CLEAN, DIRTY, and NOT_FOUND which are displayed as green, red and yellow icons the the track list (as well as '-' for tracks have not been checked).
+
+The File->Export MP3 function provides an option to export only the NOT_FOUND tracks for easy sound checking and the File->FCC Unknown Clear can be used to change all NOT_FOUND tracks to CLEAN status.
+
+
 
 <h2> Live Show</h2>
 The Live Show option enables automatic submission of track spins to Zookeeper as they are played. The procedure for using this feature is as follows:
@@ -107,18 +111,15 @@ These tracks are used to automatically pause playback in preparation for a mic b
 If a show contains DJ voice work, these files should be named MIC-<BREAK_NUMBER> as this is a trigger to DJTool to emit voice break lines to Zookeeper when played and to include timestamps in the Zookeeper CSV file. If this feature is not desired then the voice files can be arbitrarily named.
 
 
-<h2> Zookeeper Playlist Import</h2>
-Upon playlist saves, DJTool creates a ZK specific CSV export file that can be used to import the show tracks using ZK's Import function. These files can imported by clicking the Import link on the Zookeeper homepage and following the directions for csv file import.
+<h2> Zookeeper Playlist Generation</h2>
+Upon playlist saves, DJTool creates a Zookeeper specific CSV file that can be used to import the show tracks using ZK's Import function. These files can imported by clicking the Import link on the Zookeeper homepage and following the directions for CSV file import.
 
-<h2> MP3 Export</h2>
+<h2> MP3 Export (File->Export MP3)</h2>
 This function generates an MP3 representation of the entire program that is suitable for show upload. Because this operation requires converting WAV files to MP3 format, the process takes approximately 5 minutes for a 1 hour show.
 
 <h2> Output Channel Picker</h2>
 This picker selects the output device used when playing tracks. The output can be directed to the board's Aux Codec input by connecting it to your laptop and selecting using this control.
 
-
-<h2>Installing Python3</h2>
-In order to download songs from YouTube, DJTool requires that Python3.10+ be installed on your system (DJTool will run without Python3 but song downloading will fail). You will be alerted upon startup if Python3 is missing or too old. Python3 can be installed by visitng https://www.python.org/downloads/ and following the directions for your platform. Alternatively, you can use the homebrew (for Mac) or UntGetUI (for (Windows) to install it.
 
 <h2> Function Shortcuts</h2>
 The following keyboard shortcuts can be used to invoke common operations:
@@ -130,20 +131,20 @@ The following keyboard shortcuts can be used to invoke common operations:
 <li>  <DOUBLE-CLICK> - starts playback on the target file</li>
 <li>  <ENTER> - initiates song download (when entered into the URL input field</li>
 <li>  <DRAG_DROP> - imports external files that are dragged from 'finder' tools</li>
-<li>  <Shift-Drag> - relocates track position within the playlist</li>
+<li>  <Click-Drag> - relocates track position within the playlist</li>
 </ul>
 
 All other DJTool functions are invoked via the application menu bar 
 
 <h2> FAQ</h2>
 > What are the supported audio file formats
-# DJTool supports mp3 and wav files
+# DJTool supports opus, mp3 and wav files
 
 > Can I download songs while playback is running
 # Yes.
 
 > Where are downloaded files located
-# Files are downloaded to the djtool folder under the Music directory
+# Files are downloaded to the djtool/active folder under the Music directory
 
 > Is there a warning when quitting with outstanding playlist edits
 # Yes
