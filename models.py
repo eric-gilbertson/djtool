@@ -1,4 +1,4 @@
-import datetime, os, ssl
+import datetime, os, ssl, ffmpeg
 import json
 import pathlib
 import re
@@ -7,7 +7,6 @@ import urllib
 import tkinter as tk
 
 import yaml
-from pydub import AudioSegment
 
 from  system_config import SystemConfig
 from commondefs import *
@@ -38,7 +37,8 @@ class Track():
 
         if duration <= 0:
             if os.path.exists(file_path):
-                self.duration = len(AudioSegment.from_file(file_path))/1000
+                probe = ffmpeg.probe(file_path)
+                self.duration = float(probe['format']['duration'])
             else:
                 self.duration = 0
 
