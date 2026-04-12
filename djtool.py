@@ -7,7 +7,7 @@ VLC like media player optimized for use in live radio features include:
 - Treeview: left column row number, right column filename
 - Drag & drop insertion of audio files (.wav & .mp3)
 - Internal drag-to-reorder rows (with blue insertion line while dragging)
-- WAV + MP3 playback via pydub + pyaudio
+- OPUS, WAV, MP3 playback via sounddevice
 - Countdown (time remaining) in bottom-right (no progress bar)
 - Auto-play next track
 - Pause-track support: add 'pause' to pause until spacebar
@@ -26,9 +26,10 @@ VLC like media player optimized for use in live radio features include:
 #
 #gettext.translation = safe_translation
 
-import glob,  json,  os,  pathlib,  platform,  pyaudio,  shlex, webbrowser, ctypes
+import glob,  json,  os,  pathlib,  platform,  shlex, webbrowser, ctypes
 import shutil,  sys,  threading,  time,  traceback, subprocess
 import tkinter as tk,  traceback
+import sounddevice as sd
 from tkinter import PhotoImage
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
@@ -61,8 +62,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         super().__init__()
 
         # must be used as a singleton throught app so that new output devices can be found.
-        self.py_audio = pyaudio.PyAudio()
-        self.player = PlayerThread(self, self.py_audio)
+        self.sd = sd
+        self.player = PlayerThread(self, self.sd)
 
         self.is_appbundle = getattr(sys, 'frozen', False)
 
@@ -365,16 +366,15 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     def _list_output_devices(self):
         # must reinstantiate in order to see any newly attached devices
         if not self.player.is_playing():
-            self.py_audio.terminate()
-            self.py_audio = pyaudio.PyAudio()
+            self.sd._terminate()
+            self.sd._initialize()
 
         out = []
         default_output_lc = SystemConfig.output_device.lower()
         default_idx = internal_idx = -1
         out_idx = 0
-        for i in range(self.py_audio.get_device_count()):
-            info = self.py_audio.get_device_info_by_index(i)
-            if info.get("maxOutputChannels", 0) > 0:
+        for i, info  in enumerate(self.sd.query_devices()):
+            if info.get("max_output_channels", 0) > 0:
                 name = info.get("name")
                 name_lc = name.lower().strip()
                 if name_lc == default_output_lc:
@@ -1165,7 +1165,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         title_msg = f"{idx+1}: {track.artist} - {track.title}"
         self.set_title(title_msg)
         self._track_id = track.id
-        spin_thread = threading.Thread(target=self.playlist.send_track, args=(track,))
+        spin_thread = threading.Thread(target=self.playlist.send_track, args=(track, False))
         spin_thread.start()
 
     def get_next_track_for_playback(self, cur_track_id):

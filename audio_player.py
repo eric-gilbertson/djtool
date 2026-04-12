@@ -1,5 +1,5 @@
 import subprocess
-import threading, time, pyaudio
+import threading, time
 from enum import Enum
 from pydub import AudioSegment
 from djutils import logit
@@ -39,13 +39,13 @@ class UpdaterThread(threading.Thread):
 
             
 class PlayerThread(threading.Thread):
-    def __init__(self, parent, pyaudio):
+    def __init__(self, parent, sd):
         super(PlayerThread, self).__init__(daemon=True)
         self.parent = parent
         self.track = None
+        self.sd = sd
         self.state = PlayerState.STOPPED
         self.start_playback = threading.Event()
-        self.py_audio = pyaudio
         self.updater = UpdaterThread(self.parent)
         self.updater.start()
 
@@ -106,7 +106,7 @@ class PlayerThread(threading.Thread):
                     bufsize=10**6
                 )
             
-                stream = sd.OutputStream(
+                stream = self.sd.OutputStream(
                     samplerate=samplerate,
                     channels=channels,
                     dtype='float32',
