@@ -170,15 +170,11 @@ class TrackDownloader():
             message=f'Live show updating is not available because your User API Key has not been set. Enter your administrator supplied apikey using the File->Configuration dialog. See View->Help for setup help information.'
             tk.messagebox.showwarning(title='Incomplete Setup', message=message)
         elif not SystemConfig.spotify_id or not SystemConfig.spotify_secret:
-            msg = '''Spotify features are not available because the Spotify
-                 apikeys have not been set. Check that your user key in the File->Configuration
-                 dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
+            msg = '''Spotify features are not available because the Spotify apikeys have not been set. Check that your user key in the File->Configuration dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
     
             tk.messagebox.showwarning("Configuration Error", msg)
         elif not SystemConfig.genius_apikey:
-            msg = '''The FCC check feature is not available because the Genius
-                 apikey has not been set. Check that your user key in the File->Configuration
-                 dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
+            msg = '''The FCC check feature is not available because the Genius apikey has not been set. Check that your user key in the File->Configuration dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
     
             tk.messagebox.showwarning("Configuration Error", msg)
 
