@@ -34,11 +34,11 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesAssociations=yes
 DisableProgramGroupPage=yes
-InfoAfterFile=C:\Users\engineering\src\djtool\djtool_help.html
+InfoAfterFile=C:\Users\engineering\src\djtool\post_install.txt
 ; Uncomment the following line to run in non administrative install mode (install for current user only).
 ;PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=dialog
-OutputBaseFilename=mysetup
+OutputBaseFilename=djtool_setup
 SolidCompression=yes
 WizardStyle=modern dynamic
 
@@ -53,7 +53,6 @@ Source: "C:\Users\engineering\src\djtool\dist\{#MyAppExeName}"; DestDir: "{app}"
 Source: "C:\Users\engineering\src\djtool\yt-dlp.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Users\engineering\src\djtool\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Users\engineering\src\djtool\djtool.ico"; DestDir: "{app}"; Flags: ignoreversion
-; NOTE: Don't use "Flags: ignoreversion" on any shared system files
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocExt}\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}"; ValueData: ""; Flags: uninsdeletevalue
@@ -64,7 +63,7 @@ Root: HKA; Subkey: "Software\Classes\{#MyAppAssocKey}\shell\open\command"; Value
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
 Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: desktopicon
-Name: "{commondesktop}\\{#MyAppName}"; Filename: "{app}\\{#MyAppFile.exe}"; IconFilename: "{app}\djtool.ico"; Tasks: desktopicon
+Name: "{commondesktop}\\{#MyAppName}"; Filename: "{app}\\{#MyAppExeName}"; IconFilename: "{app}\djtool.ico"; Tasks: desktopicon
 
 
 [Run]

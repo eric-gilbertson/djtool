@@ -7,7 +7,7 @@ VLC like media player optimized for use in live radio features include:
 - Treeview: left column row number, right column filename
 - Drag & drop insertion of audio files (.wav & .mp3)
 - Internal drag-to-reorder rows (with blue insertion line while dragging)
-- WAV + MP3 playback via pydub + pyaudio
+- OPUS, WAV, MP3 playback via sounddevice
 - Countdown (time remaining) in bottom-right (no progress bar)
 - Auto-play next track
 - Pause-track support: add 'pause' to pause until spacebar
@@ -26,9 +26,10 @@ VLC like media player optimized for use in live radio features include:
 #
 #gettext.translation = safe_translation
 
-import glob,  json,  os,  pathlib,  platform,  pyaudio,  shlex, webbrowser, ctypes
+import glob,  json,  os,  pathlib,  platform,  shlex, webbrowser, ctypes
 import shutil,  sys,  threading,  time,  traceback, subprocess
 import tkinter as tk,  traceback
+import sounddevice as sd
 from tkinter import PhotoImage
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
@@ -61,8 +62,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         super().__init__()
 
         # must be used as a singleton throught app so that new output devices can be found.
-        self.py_audio = pyaudio.PyAudio()
-        self.player = PlayerThread(self, self.py_audio)
+        self.sd = sd
+        self.player = PlayerThread(self, self.sd)
 
         self.is_appbundle = getattr(sys, 'frozen', False)
 
@@ -234,7 +235,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         filemenu.add_command(label="Update Playlist", accelerator = '⌘-s', command=self.update_playlist)
         filemenu.add_command(label="ClearPlaylist...", command=self.clear_playlist)
         filemenu.add_command(label="Import Audio...", command=self.import_audio_files)
-        filemenu.add_command(label="Save MP3...", command=self.save_mp3)
+        filemenu.add_command(label="Export MP3...", command=self.save_mp3)
         filemenu.add_command(label="Update yt-dlp", command=self.downloader.update_ytdlp)
         menubar.add_cascade(label="File", menu=filemenu)
 
@@ -244,6 +245,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         editmenu.add_command(label="Insert Pause", command=self.insert_pause)
         editmenu.add_command(label="Insert Mic-Break", command=self.insert_mic_break)
         editmenu.add_command(label="FCC Check", command=self.fcc_check)
+        editmenu.add_command(label="FCC Clear...", command=self.fcc_set_unknown_to_safe)
         menubar.add_cascade(label="Edit", menu=editmenu)
 
         viewmenu = tk.Menu(menubar, tearoff=0)
@@ -364,17 +366,20 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     def _list_output_devices(self):
         # must reinstantiate in order to see any newly attached devices
         if not self.player.is_playing():
-            self.py_audio.terminate()
-            self.py_audio = pyaudio.PyAudio()
+            self.sd._terminate()
+            self.sd._initialize()
 
         out = []
         default_output_lc = SystemConfig.output_device.lower()
         default_idx = internal_idx = -1
         out_idx = 0
-        for i in range(self.py_audio.get_device_count()):
-            info = self.py_audio.get_device_info_by_index(i)
-            if info.get("maxOutputChannels", 0) > 0:
-                name = info.get("name")
+        devices = self.sd.query_devices()
+        for i, info  in enumerate(devices):
+            name = info.get("name")
+            out_channels = info.get('max_output_channels', 0)
+            in_channels = info.get('max_input_channels', 0)
+            logit(f"dev: {name}, {in_channels}, {out_channels}")
+            if out_channels > 0 and in_channels == 0:
                 name_lc = name.lower().strip()
                 if name_lc == default_output_lc:
                     default_idx = out_idx
@@ -662,7 +667,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         file_count = len(files) - 1
         for path in files:
             path = path.strip()
-            if not path or not path.lower().endswith((".mp3", ".wav")) or not os.path.isfile(path):
+            if not path or not path.lower().endswith((".mp3", ".wav", ".opus")) or not os.path.isfile(path):
                 tk.messagebox.showwarning(title="Error", message=f'Ignoring invalid file:" {path}', parent=self)
                 continue
 
@@ -786,6 +791,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 audio = AudioSegment.from_mp3(track.file_path)
             elif track.file_path.endswith('.wav') and os.path.exists(track.file_path):
                 audio = AudioSegment.from_wav(track.file_path)
+            elif track.file_path.endswith('.opus') and os.path.exists(track.file_path):
+                audio = AudioSegment.from_file(track.file_path, format="ogg")
             else:
                 skip_msg = f"Skipping missing or unsupported file: {track.file_path}"
                 logit(skip_msg)
@@ -797,6 +804,17 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         full_show.export(filename, format="mp3")
         logit(f"done mp3 export {filename}")
         tk.messagebox.showwarning(title="MP3 File Saved", message=f'Playlist saved as {filename}', parent= self)
+
+    def fcc_set_unknown_to_safe(self):
+        msg = '''Would you like set all tracks with unknown FCC status (yellow) to safe (green)?'''
+        if messagebox.askyesno("Confirm Operation", msg, parent=self):
+            for track in self.tree_datamap.values():
+                if track.fcc_status == 'NOT_FOUND':
+                    logit(f"set {track.title} to FCC clean")
+                    track.fcc_status = FCCChecker.FCC_STATUS_AR[0]
+                    row_values = self.tree.item(track.id)["values"]
+                    row_values = (*row_values[0:5], track.fcc_status_glyph())
+                    self.tree.item(track.id, values=row_values)
 
     def fcc_check(self):
         if SystemConfig.check_have_genius_key():
@@ -824,7 +842,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         for track in self.tree_datamap.values():
             current_files.append(track.file_path)
 
-        audio_files = glob.glob(dir_path + "/*.mp3") + glob.glob(dir_path + "/*.wav")
+        audio_files = glob.glob(dir_path + "/*.mp3") +  \
+                      glob.glob(dir_path + "/*.wav") + \
+                      glob.glob(dir_path + "/*.opus")
         new_files = False
         WAV_CHECK_SIZE = 100000000
         MP3_CHECK_SIZE = 10000000
@@ -832,7 +852,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             if not file_path in current_files:
                 file_size = os.path.getsize(file_path)
                 file_ext = extension = pathlib.Path(file_path).suffix
-                if (file_ext == ".mp3" and file_size > MP3_CHECK_SIZE) or file_size > WAV_CHECK_SIZE:
+                if ((file_ext == ".mp3" or file_ext == ".opus") and file_size > MP3_CHECK_SIZE) or file_size > WAV_CHECK_SIZE:
                     file_name = pathlib.Path(file_path).name
                     msg = f'File -{file_name}- is very large. Do you want to import it?'
                     if not messagebox.askyesno("Confirm Operation", msg, parent=self):
@@ -1006,12 +1026,14 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 idx = 1
                 for track_obj in track_objs:
                     track = Track.from_dict(track_obj)
-                    if track:
+                    if track and track.duration == 0 or os.path.exists(track.file_path):
                         track_start = HMS_from_seconds(total_secs)
                         track.id = self.tree.insert("", "end", values=(idx, track_start, track.artist, track.title, track.album, track.fcc_status_glyph()))
                         self.tree_datamap[track.id] = track
                         total_secs = total_secs + track.duration
                         idx = idx + 1
+                    elif track:
+                        logit(f"Skipping track, missing file: {track.file_path}")
     
             logit(f"Imported {idx} tracks.")
         except Exception as e:
@@ -1147,7 +1169,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         title_msg = f"{idx+1}: {track.artist} - {track.title}"
         self.set_title(title_msg)
         self._track_id = track.id
-        spin_thread = threading.Thread(target=self.playlist.send_track, args=(track,))
+        spin_thread = threading.Thread(target=self.playlist.send_track, args=(track, False))
         spin_thread.start()
 
     def get_next_track_for_playback(self, cur_track_id):
