@@ -1,9 +1,10 @@
 # asynchromously downloads a track using yt-dlp and performs name cleanup on the downloaded file.
 #
-import io
+import io, glob
 import logging
 import sys, platform, urllib, stat, ssl, certifi
 import threading, subprocess, shutil, re, os, zipfile
+from datetime import datetime
 from pathlib import Path
 from tkinter import simpledialog
 import tkinter as tk
@@ -22,10 +23,11 @@ FIELD_SEPARATOR = '^'
 
 # downloads using the python library
 class YTDLPThread(threading.Thread):
-    def __init__(self, out_file, track_url, done_callback, audio_format):
+    def __init__(self, file_prefix, out_file, track_url, done_callback, audio_format):
         super(YTDLPThread, self).__init__()
         self.done_callback = done_callback
         self.out_file = out_file
+        self.file_prefix = file_prefix
         self.track_url = track_url
         self.audio_format = audio_format
 
@@ -45,39 +47,41 @@ class YTDLPThread(threading.Thread):
             'quiet': True,
         }
 
-        if self.audio_format != "opus":
-            ydl_opts['postprocessors'] =  [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': self.audio_format,   # Force conversion to WAV
-             }],
+        ydl_opts['postprocessors'] = [{
+            'key': 'FFmpegExtractAudio',  # Correct key is essential
+            'preferredcodec': self.audio_format,
+        }]
 
         with YoutubeDL(ydl_opts) as ydl:
             status = ydl.download([self.track_url])
             logit(f"download status: {status}")
 
         stdout = str(output_buffer.getvalue())
-        self.done_callback(status, stdout)
+        self.done_callback(status, self.file_prefix, stdout)
         pass
 
 # downloads using external yt-dlp binary
 class CommandThread(threading.Thread):
-    def __init__(self, cmd, done_callback):
+    def __init__(self, file_prefix, cmd, done_callback):
         super(CommandThread, self).__init__()
         self.done_callback = done_callback
         self.cmd = cmd
+        self.file_prefix = file_prefix
 
     def run(self):
         process = subprocess.Popen(self.cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True)
         (stdout, stderr) = process.communicate()
         # merging them because that's what the API versiond does.
         ret_msg = stderr.decode('UTF-8') + "\n" +stdout.decode('UTF-8')
-        self.done_callback(process.returncode, ret_msg)
+        self.done_callback(process.returncode, self.file_prefix, ret_msg)
         pass
 
 
 class TrackDownloader():
     YTDL_ALT_PATH_MACOS = os.path.expanduser("~") + "/Library/yt-dlp_macos/yt-dlp_macos"
     AUDIO_FORMAT = "opus"
+    YTDWNLD_PREFIX = 'YTDLPDWNLD-'
+    YTDWNLD_PREFIX_END_CHAR = '_'
      
     def __init__(self, parent, download_dir):
         # use user installed verion if available, else use bundled version if availabe.
@@ -218,44 +222,46 @@ class TrackDownloader():
             return False
 
         self.is_done = False
+        # give a unique prefix that can be used to identify the downloaded file. was getting from
+        # ytdlp's stdout but there were cases where file path characeters were lost on the byte
+        # to string conversion on Windoze.
+        file_prefix = self.YTDWNLD_PREFIX + datetime.now().strftime('%Y-%m-%dT%H%M%S') + self.YTDWNLD_PREFIX_END_CHAR
+        dwnld_path = f"{self.download_dir}/{file_prefix}"
         if self.YTDL_PATH:
             # passing in ffmpeg location because it may not be in the user's PATH
-            out_file = '"{}/{}_%(title)s.%(ext)s"'.format(self.download_dir, artistTerm)
+            out_file = f'"{dwnld_path}{artistTerm}_%(title)s.%(ext)s"'
             cmd = f'{self.YTDL_PATH} --ffmpeg-location {self.FFMPEG_PATH} --extract-audio --audio-format {self.AUDIO_FORMAT}  -o {out_file} {self.track_url}'
             logit(f"Start external download: {cmd}")
-            self.download_thread = CommandThread(cmd, self.on_fetch_done)
+            self.download_thread = CommandThread(dwnld_path, cmd, self.on_fetch_done)
             self.download_thread.start()
         else:
             # NOTE: no ext here, the extension will be set by the library
-            out_file = '{}/{}_%(title)s'.format(self.download_dir, artistTerm)
+            out_file = f'{dwnld_path}{artistTerm}_%(title)s'
             logit(f"Start internal download: {self.track_url}, {out_file}")
-            self.download_thread = YTDLPThread(out_file, self.track_url, self.on_fetch_done, self.AUDIO_FORMAT)
+            self.download_thread = YTDLPThread(dwnld_path, out_file, self.track_url, self.on_fetch_done, self.AUDIO_FORMAT)
             self.download_thread.start()
 
         return True
 
-    def on_fetch_done(self, returnCode, stdOut):
+    def on_fetch_done(self, returnCode, dwnld_prefix, stdOut):
         self.err_msg = ''
-        if stdOut.find('File name too long') > 0:
-            self.name_too_long = True
-        elif returnCode == 0:
-            found_file = False
-            idx1 = stdOut.rfind("Destination: ") + 13
-            idx2 = stdOut.find(f'.{self.AUDIO_FORMAT}', idx1)
-            if idx1 > 13 and idx2 > idx1:
-                self.download_file =  stdOut[idx1 : idx2 + len(self.AUDIO_FORMAT)+1]
-                logit("Downloaded file: " + self.download_file)
-                if os.path.exists(self.download_file):
-                    (self.track.file_path, file_artist, file_title)  = self.clean_filepath(self.download_file)
-                    # use the title/artist from the downloaded iff it has not already been set.
-                    self.track.artist = self.track.artist if self.track.artist else file_artist
-                    self.track.title = self.track.title if self.track.title else file_title
-                    found_file = trim_audio(self.track.file_path)
-            if not found_file:
+        dwlnd_file_ar = glob.glob(f"{dwnld_prefix}*")
+        have_file = len(dwlnd_file_ar) > 0
+        if returnCode == 0 and have_file:
+            self.download_file = dwlnd_file_ar[0]
+            logit("Downloaded file: " + self.download_file)
+            (self.track.file_path, file_artist, file_title)  = self.clean_filepath(self.download_file)
+            # use the title/artist from the downloaded iff it has not already been set.
+            self.track.artist = self.track.artist if self.track.artist else file_artist
+            self.track.title = self.track.title if self.track.title else file_title
+            have_file = trim_audio(self.track.file_path)
+            if not have_file:
                 self.err_msg = f"Download file is corrupt or does not exist -{self.download_file}-. {stdOut}"
                 self.download_file = None
+        elif stdOut.find('File name too long') > 0:
+            self.name_too_long = True
         else:
-            self.err_msg = "yt-dlp download error: {stdOut}"
+            self.err_msg = f"yt-dlp download error: {stdOut}"
 
         self.is_done = True
 
@@ -265,6 +271,9 @@ class TrackDownloader():
     def clean_filepath(filepath):
         new_name_ext = os.path.basename(filepath)
         new_name, name_extension = os.path.splitext(new_name_ext)
+        if new_name.startswith(TrackDownloader.YTDWNLD_PREFIX):
+            new_name = new_name[new_name.find(TrackDownloader.YTDWNLD_PREFIX_END_CHAR) + 1:]
+
     
         if not filepath.endswith(('.wav', ".mp3", ".opus")):
             logit(f"Unexpected download file type: {filepath}")
@@ -335,6 +344,9 @@ class TrackDownloader():
         new_file = f"{os.path.dirname(filepath)}/{new_name}{name_extension}"
 
         if new_file != filepath:
+            if os.path.exists(new_file):
+                os.remove(new_file) # needed for Windoze
+
             os.replace(filepath, new_file)
     
         Path(new_file).touch()

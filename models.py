@@ -212,7 +212,7 @@ class ZKPlaylist():
         }
 
         if not skip_active_check:
-            data["created"] = "auto",
+            data["created"] = "auto"
 
         data_json = json.dumps(data)
         req = urllib.request.Request(url, method=f'POST')
