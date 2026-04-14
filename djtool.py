@@ -373,9 +373,13 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         default_output_lc = SystemConfig.output_device.lower()
         default_idx = internal_idx = -1
         out_idx = 0
-        for i, info  in enumerate(self.sd.query_devices()):
-            if info.get("max_output_channels", 0) > 0:
-                name = info.get("name")
+        devices = self.sd.query_devices()
+        for i, info  in enumerate(devices):
+            name = info.get("name")
+            out_channels = info.get('max_output_channels', 0)
+            in_channels = info.get('max_input_channels', 0)
+            logit(f"dev: {name}, {in_channels}, {out_channels}")
+            if out_channels > 0 and in_channels == 0:
                 name_lc = name.lower().strip()
                 if name_lc == default_output_lc:
                     default_idx = out_idx
