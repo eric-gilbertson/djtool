@@ -1,4 +1,5 @@
-import datetime, os, ssl, ffmpeg
+import datetime, os, ssl
+from tinytag import TinyTag
 import json
 import pathlib
 import re
@@ -37,8 +38,7 @@ class Track():
 
         if duration <= 0:
             if os.path.exists(file_path):
-                probe = ffmpeg.probe(file_path)
-                self.duration = float(probe['format']['duration'])
+                self.duration = TinyTag.get(file_path).duration
             else:
                 self.duration = 0
 
