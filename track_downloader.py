@@ -56,7 +56,7 @@ class YTDLPThread(threading.Thread):
             status = ydl.download([self.track_url])
             logit(f"download status: {status}")
 
-        stdout = str(output_buffer.getvalue())
+        stdout = output_buffer.decode('utf-8')
         self.done_callback(status, self.file_prefix, stdout)
         pass
 

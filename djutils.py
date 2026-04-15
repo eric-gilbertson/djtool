@@ -4,11 +4,15 @@ import shutil
 import subprocess
 
 def logit(msg):
-    timestr = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S: ")
-    msg = f'{timestr}:  {msg}'
-    print(msg)
-    with open(get_logfile_path(), 'a') as logfile:
-        logfile.write(msg + '\n')
+    # don't let funky character encoding break things
+    try:
+        timestr = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S: ")
+        msg = f'{timestr}:  {msg}'
+        print(msg)
+        with open(get_logfile_path(), 'a') as logfile:
+            logfile.write(msg + '\n')
+    except Exception as ex:
+        print(f"Exception writing to log {ex}")
 
 
 def get_logfile_path():

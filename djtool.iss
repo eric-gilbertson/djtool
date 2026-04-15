@@ -50,8 +50,8 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 
 [Files]
 Source: "C:\Users\engineering\src\djtool\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "C:\Users\engineering\src\djtool\yt-dlp.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Users\engineering\src\djtool\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\engineering\src\djtool\ffprobe.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Users\engineering\src\djtool\djtool.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]

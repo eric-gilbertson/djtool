@@ -1,4 +1,4 @@
-import subprocess
+import subprocess, sys
 import threading, time
 from enum import Enum
 from pydub import AudioSegment
@@ -82,6 +82,10 @@ class PlayerThread(threading.Thread):
         self.state = PlayerState.PLAYING
         device_index = self.parent._get_selected_device_index()
 
+        ffmpeg_flags = 0
+        if sys.platform == "win32":
+            ffmpeg_flags = subprocess.CREATE_NO_WINDOW
+
         while self.is_playing() and self.track:
             try:
                 self.parent.prepare_track_for_playback(self.track)
@@ -101,9 +105,11 @@ class PlayerThread(threading.Thread):
                         "-ar", str(samplerate),
                         "-"
                     ],
+                    stdin=subprocess.DEVNULL,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
-                    bufsize=10**6
+                    bufsize=10**6,
+                    creationflags=ffmpeg_flags
                 )
             
                 stream = self.sd.OutputStream(
