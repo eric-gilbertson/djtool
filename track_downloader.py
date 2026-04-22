@@ -252,7 +252,7 @@ class TrackDownloader():
         if self.YTDL_PATH:
             # passing in ffmpeg location because it may not be in the user's PATH
             out_file = f'"{dwnld_path}{artistTerm}_%(title)s.%(ext)s"'
-            cmd = f'{self.YTDL_PATH} {throttle_option} --ffmpeg-location {self.FFMPEG_PATH} --extract-audio --audio-format {self.AUDIO_FORMAT}  -o {out_file} {self.track_url}'
+            cmd = f'{self.YTDL_PATH} {throttle_option} --ffmpeg-location {self.FFMPEG_PATH} --extract-audio --audio-format {self.AUDIO_FORMAT}  -o {out_file} "{self.track_url}"'
             logit(f"Start external download: {cmd}")
             self.download_thread = CommandThread(dwnld_path, cmd, self.on_fetch_done)
             self.download_thread.start()

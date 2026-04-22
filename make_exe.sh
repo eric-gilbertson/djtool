@@ -4,7 +4,8 @@ set -e
 
 APP_NAME="DJTool"
 SCRIPT_NAME="djtool.py"
-INNO_PATH="C:/Users/engineering/AppData/Local/Programs/Inno Setup 6/iscc.exe"
+#INNO_PATH="C:/Users/engineering/AppData/Local/Programs/Inno Setup 6/iscc.exe"
+INNO_PATH="iscc.exe"
 
 if [[ -z $VIRTUAL_ENV ]]; then
   echo "\$VIRUTALN_ENV is empty or not set"

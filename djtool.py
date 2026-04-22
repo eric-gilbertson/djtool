@@ -1229,7 +1229,6 @@ if __name__ == "__main__":
     if platform.system() == 'Windows':
         ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("mr.bones_djtool")
 
-    sys.stdout.reconfigure(encoding='utf-8')
     app = AudioPlaylistApp()
     if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
         logit("load playlist: " + sys.argv[1])
