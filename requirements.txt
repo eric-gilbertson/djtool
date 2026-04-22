@@ -13,7 +13,6 @@ macholib
 numpy
 packaging
 pillow
-PyAudio
 pydub
 pyinstaller
 pyinstaller-hooks-contrib
@@ -22,6 +21,7 @@ RapidFuzz
 redis
 requests
 setuptools
+sounddevice
 soupsieve
 spotipy
 tkinterdnd2
