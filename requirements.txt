@@ -10,6 +10,7 @@ darkdetect
 idna
 lyricsgenius
 macholib
+numpy
 packaging
 pillow
 PyAudio
@@ -24,6 +25,8 @@ setuptools
 soupsieve
 spotipy
 tkinterdnd2
+tinytag
 typing_extensions
 urllib3
 ytmusicapi
+yt_dlp

@@ -1,6 +1,5 @@
 from tkinter import ttk, simpledialog
 import tkinter as tk
-
 from fcc_checker import FCCChecker
 from models import UserConfiguration
 from system_config import SystemConfig

@@ -1,6 +1,6 @@
-# Youtube Download Tool
+# DJTool
 
-This Python3 program uses youtube-dl to download audio tracks to the local disk and displays
+This Python3 program uses yt-dlp  to download audio tracks to the local disk and displays
 the downloaded files in a drag-and-drop enabled list control for easy transfer to other tools such
 as Audacity. In order to conserve disk space files are deleted several seconds after they
 are dragged, e.g. it assumes that the target tool creates its own copy of the file. Files

@@ -3,19 +3,12 @@ from tinytag import TinyTag
 import json
 import pathlib
 import re
-import time
 import urllib
 import tkinter as tk
-
 import yaml
-
 from  system_config import SystemConfig
 from commondefs import *
-
-import os
-
 from djutils import logit
-from fcc_checker import get_album_label
 
 
 class Track():
@@ -46,6 +39,10 @@ class Track():
         dict = self.__dict__
         return dict
 
+    def have_valid_album(self):
+        result = self.album and self.album != '-'
+        return result
+
     def reset(self):
         self.id = -1
         self.fcc_status = ''
@@ -62,14 +59,15 @@ class Track():
         return retval
 
     def get_primary_artist(self):
-        delimiters = r'(,|;| with | ft\. | featuring )'
+        delimiters = r'(\(|,|;| with | ft\. | featuring )'
 
         artist_ar = re.split(delimiters, self.artist)
         return artist_ar[0]
 
     # requires spotify premium account
     def fetch_label(self):
-        self.label = get_album_label(self.artist, self.album)
+        return "UNKNOWN_LABEL"
+        #self.label = get_album_label(self.artist, self.album)
 
     def have_fcc_status(self):
         have_status = len(self.fcc_status) > 0 and self.fcc_status != '-'
