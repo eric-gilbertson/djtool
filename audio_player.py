@@ -1,7 +1,6 @@
 import subprocess, sys
 import threading, time
 from enum import Enum
-from pydub import AudioSegment
 from djutils import logit
 import sounddevice as sd
 import numpy as np

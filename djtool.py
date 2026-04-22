@@ -27,7 +27,7 @@ VLC like media player optimized for use in live radio features include:
 #gettext.translation = safe_translation
 
 import glob,  json,  os,  pathlib,  platform,  shlex, webbrowser, ctypes
-import shutil,  sys,  threading,  time,  traceback, subprocess
+import shutil,  sys,  threading,  time
 import tkinter as tk,  traceback
 import sounddevice as sd
 from tkinter import PhotoImage
@@ -163,14 +163,21 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     
         return base_path
 
+    def set_cursor(self, cursor):
+        logit(f"set cursor {cursor}")
+        self.config(cursor=cursor)
+        self.url.config(cursor=cursor)
+        self.update_idletasks()
+        self.update()
+
+
     def _fetch_track(self, use_fullname=True):
         url_entry = self.urlEntry.get()
         if self.downloader.fetch_track(self, url_entry, use_fullname):
-            self.url.config(cursor="clock")
-            self.url.update()
             self._fetch_track_done()
         else:
-            self.url.config(cursor="")
+            self.set_cursor("")
+
 
                 
     def _fetch_track_done(self):
@@ -186,22 +193,29 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     self.after(500, self._fetch_track_done)
                 else:
                     return
-            elif  self.downloader.download_file:
+            elif len(self.downloader.tracks) > 0:
                 self._set_dirty(True)
-                track = self.downloader.track
-
-                # TODO: do these in background
-                status, comment = FCCChecker.fcc_song_check(track.artist, track.title)
-                #track.fetch_label() - requires spotify premium
+                for track in self.downloader.tracks:
+                    # TODO: do these in background
+                    fcc_check = FCCChecker(track.artist, track.title)
+                    status = fcc_check.fcc_status
+                    comment = fcc_check.explicit_msg
+                    #track.fetch_label() - requires spotify premium
+    
+                    # replace with the genius album if we don't have a good album name already.
+                    if fcc_check.album and not track.have_valid_album():
+                        track.album = fcc_check.album
+                
+                    self._insert_track(-1, status, comment, track.artist, track.title, track.album, track.label, track.file_path, True)
 
                 self.url.delete(0, "end")
-                self.url.config(cursor="")
                 self.url.update()
+                self.set_cursor("")
                 self.bell()
-                self._insert_track(-1, status, comment, track.artist, track.title, track.album, track.label, track.file_path, True)
             else:
-                self.bell()
                 tk.messagebox.showwarning(title='Error', message=self.downloader.err_msg, parent=self)
+                self.set_cursor("")
+                self.bell()
 
 
     def _edit_configuration(self):
@@ -378,7 +392,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             name = info.get("name")
             out_channels = info.get('max_output_channels', 0)
             in_channels = info.get('max_input_channels', 0)
-            logit(f"dev: {name}, {in_channels}, {out_channels}")
+            #logit(f"dev: {name}, {in_channels}, {out_channels}")
             if out_channels > 0 and in_channels == 0:
                 name_lc = name.lower().strip()
                 if name_lc == default_output_lc:
@@ -809,9 +823,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         msg = '''Would you like set all tracks with unknown FCC status (yellow) to safe (green)?'''
         if messagebox.askyesno("Confirm Operation", msg, parent=self):
             for track in self.tree_datamap.values():
-                if track.fcc_status == 'NOT_FOUND':
+                if track.fcc_status == FCCChecker.FCC_NOT_FOUND:
                     logit(f"set {track.title} to FCC clean")
-                    track.fcc_status = FCCChecker.FCC_STATUS_AR[0]
+                    track.fcc_status = FCCChecker.FCC_CLEAN
                     row_values = self.tree.item(track.id)["values"]
                     row_values = (*row_values[0:5], track.fcc_status_glyph())
                     self.tree.item(track.id, values=row_values)
@@ -820,9 +834,12 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         if SystemConfig.check_have_genius_key():
             for track in self.tree_datamap.values():
                 if not track.have_fcc_status() and not track.is_stop_file() and not track.is_spot_file():
-                    status, comment = FCCChecker.fcc_song_check(track.get_primary_artist(), track.title)
-                    track.fcc_status = status
-                    track.fcc_comment = comment
+                    fcc_check = FCCChecker(track.get_primary_artist(), track.title)
+                    track.fcc_status = fcc_check.fcc_status
+                    track.fcc_comment = fcc_check.explicit_msg
+                    if fcc_check.album and not track.have_valid_album():
+                        track.album = fcc_check.album
+
                     row_values = self.tree.item(track.id)["values"]
                     row_values = (*row_values[0:5], track.fcc_status_glyph())
                     self.tree.item(track.id, values=row_values)
@@ -1214,7 +1231,7 @@ if __name__ == "__main__":
 
     app = AudioPlaylistApp()
     if len(sys.argv) > 1 and os.path.exists(sys.argv[1]):
-        print("load playlist: " + sys.argv[1])
+        logit("load playlist: " + sys.argv[1])
         app.load_playlist(sys.argv[1])
 
     app.after(500, app.downloader.check_dependencies())
