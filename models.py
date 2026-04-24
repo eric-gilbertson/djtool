@@ -219,7 +219,7 @@ class ZKPlaylist():
         req.add_header("X-APIKEY", apikey)
         
         try:
-            with urllib.request.urlopen(req, data=data_json.encode('utf-8'), timeout=2, context=self.ssl_context) as response:
+            with urllib.request.urlopen(req, data=data_json.encode('utf-8'), timeout=6, context=self.ssl_context) as response:
                 resp_obj  = json.loads(response.read())
                 success = True
         except Exception as e:

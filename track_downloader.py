@@ -238,6 +238,13 @@ class TrackDownloader():
             tk.messagebox.showwarning(title="Error", message=error_msg, parent=self.parent)
             return False
 
+        is_playlist = self.track_url.find('&list=') > 0
+        if is_playlist:
+            msg = "This URL is for a playlist. Are you sure that you want to download the entire playlist?"
+            if not tk.messagebox.askokcancel(title="Confirm Operation", message=msg, parent=self.parent):
+                return False
+
+
         logit(f"start fetch & set cursor")
         self.parent.after(0, self.parent.set_cursor('clock'))
         self.is_done = False
@@ -247,7 +254,6 @@ class TrackDownloader():
         # to string conversion on Windoze.
         file_prefix = self.YTDWNLD_PREFIX + datetime.now().strftime('%Y-%m-%dT%H%M%S') + self.YTDWNLD_PREFIX_END_CHAR
         dwnld_path = f"{self.download_dir}/{file_prefix}"
-        is_playlist = self.track_url.find('playlist?list=') > 0
         throttle_option = ' --sleep-interval 5 --max-sleep-interval 10 ' if is_playlist else ''
         if self.YTDL_PATH:
             # passing in ffmpeg location because it may not be in the user's PATH
@@ -424,8 +430,9 @@ class SelectTrackDialog(simpledialog.Dialog):
         idx = 1
         tracks = ''
         for track in self.track_choices:
-            tracks = tracks + f"{idx}: {track['duration']} {track['title']} - {track['artists'][0]['name']} - {track['album']['name']}\n"
-            idx = idx + 1
+            if track: # somehow got here if a None track so add this protection
+                tracks = tracks + f"{idx}: {track['duration']} {track['title']} - {track['artists'][0]['name']} - {track['album']['name']}\n"
+                idx = idx + 1
 
         self.choices_entry.insert("1.0", tracks)
         self.track_info.insert(0, f'{self.track.artist} - {self.track.title}')

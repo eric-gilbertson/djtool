@@ -1,0 +1,53 @@
+DJTool Installation & API Key Setup For Mac:
+
+- Download app installer by entering the following URL into a browser:
+  kzsu.stanford.edu/djtool/download?filename=djtool.dmg
+- double-click the downloaded djtool.dmg file - will launch DJTool install window
+- drag the djtool icon to the Applications icon and release
+- close the DJTool installation window
+- using Finder, eject the DJTool app by clicking the small up arrow in the Locations section
+- click Applications in Finder and double click DJTool
+- from the can't be opened alert window, click OK
+- From System Preferences, click Security & Privacy and the General tab
+- Look for the Allow Apps Downloaded from: section and click Open Anyway for DJTool
+- get another can't be opened alert, click Open
+- upon startup DJTool will display an alert stating that certain features are not available due to missing API keys, click Okay
+- open View->Help for getting started info
+- see below to set your API keys
+
+
+DJTool Installation & API Key Setup For Windows:
+
+- download djtool_setup.exe by entering following into any browser:
+  https://kzsu.stanford.edu/djtool/download?filename=djtool_setup.exe
+- from your Downloads folder double click djtool_setup.ex
+- from the install warning dialog click More Info followed by Run Anyway
+- click Next & Finish
+- upon startup DJTool will display an alert stating that certain features are not available due to missing API keys, click Okay
+- open View->Help for getting started info
+- see below to set your API keys
+
+
+User API Key Setup (optional, but needed for FCC checking and playlist generation):
+- goto https://kzsu.stanford.edu/internal/profile/
+- click Add Key
+- copy your API Key being clicking on the clipboard icon
+- in DJTool click File->Configure and paste the text into the User API Key field
+
+Zookeeper API Key Setup (optional but needed to post spins to Zookeeper playlists):
+- goto https://zookeeper.stanford.edu/?action=adminUsers&subaction=manageKeys
+- click Generate New Key
+- copy your API Key being clicking on the clipboard icon
+- in DJTool click File->Configure and paste the text into the Zookeeper API Key field
+
+Reporting Issues:
+If you encounter any issues please send email with the following:
+
+- steps to reproduce
+- screenshot of any error response
+- log file (djtool_log.txt in your home directory)
+
+
+
+
+

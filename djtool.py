@@ -63,6 +63,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
         # must be used as a singleton throught app so that new output devices can be found.
         self.sd = sd
+        self.last_cursor_widget = None
         self.player = PlayerThread(self, self.sd)
 
         self.is_appbundle = getattr(sys, 'frozen', False)
@@ -163,13 +164,62 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     
         return base_path
 
-    def set_cursor(self, cursor):
-        logit(f"set cursor {cursor}")
-        self.config(cursor=cursor)
-        self.url.config(cursor=cursor)
-        self.update_idletasks()
-        self.update()
+    # have to do all this hoo-haa in order to get the cursor to immdiately change on
+    # MacOs when it is preceeded by the display of a secondary window, e.g. track selection
+    # dialog. without this the cursor doesn't change until the user moves the mouse.
+    def set_cursor(self, cursor, doIt=False):
+        if doIt:
+            top = self.winfo_toplevel()
+            top.config(cursor=cursor)
+            self.config(cursor=cursor)
+        
+            # Force cursor onto widget under pointer (macOS critical)
+            x, y = top.winfo_pointerxy()
+            if cursor and (widget := top.winfo_containing(x, y)):
+                try:
+                    logit(f"set widget: {cursor}")
+                    widget.config(cursor=cursor)
+                    self.last_cursor_widget = widget
+                except tk.TclError as ex:
+                    logit(f"set widget exception: {cursor}")
+                    pass
+            elif not cursor and self.last_cursor_widget:
+                logit(f"set last widget: {cursor}")
+                self.last_cursor_widget.config(cursor=cursor) # handle case where user moused out of app
+                self.last_cursor_widget = None
+            else:
+                logit(f"widget not found")
+    
+            top.update_idletasks()
+        else:
+            self.after(0, lambda: self.set_cursor(cursor, True))
 
+#    def set_cursor(self, cursor, doIt=False):
+#        if doIt:
+#            top = self.winfo_toplevel()
+#            top.config(cursor=cursor)
+#            self.config(cursor=cursor)
+#        
+#            # Force cursor onto widget under pointer (macOS critical)
+#            x, y = top.winfo_pointerxy()
+#            if widget := top.winfo_containing(x, y):
+#                try:
+#                    logit(f"set widget: {cursor}")
+#                    widget.config(cursor=cursor)
+#                    self.last_cursor_widget = widget if cursor else None
+#                except tk.TclError as ex:
+#                    logit(f"set widget exception: {cursor}")
+#                    pass
+#            elif self.last_cursor_widget:
+#                logit(f"set last widget: {cursor}")
+#                self.last_cursor_widget.config(cursor=cursor) # handle case where user moused out of app
+#                self.last_cursor_widget = None
+#            else:
+#                logit(f"widget not found")
+#    
+#            top.update_idletasks()
+#        else:
+#            self.after(0, lambda: self.set_cursor(cursor, True))
 
     def _fetch_track(self, use_fullname=True):
         url_entry = self.urlEntry.get()
