@@ -1046,9 +1046,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         text_area.pack(expand=True, fill='both', padx=10, pady=10)
     
         log_file = get_logfile_path()
-        file_content = 'File not found.'
+        file_content = f'Log file -{log_file} not found.'
+        encoding = 'cp1252' if platform.system() == 'Windows' else 'utf-8'
         try:
-            with open(log_file, 'r', encoding='utf-8') as file:
+            with open(log_file, 'r', encoding=encoding) as file:
                 file_content = file.read()
         except Exception as e:
             logit(f"Could not read log file: {log_file}, {e}")

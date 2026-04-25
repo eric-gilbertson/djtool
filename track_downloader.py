@@ -1,6 +1,6 @@
 # asynchromously downloads a track using yt-dlp and performs name cleanup on the downloaded file.
 #
-import io, glob
+import io, glob, traceback
 import logging
 import platform, urllib, stat, ssl, certifi
 import threading, subprocess, shutil, re, os, zipfile
@@ -68,7 +68,7 @@ class YTDLPThread(threading.Thread):
             stdout = output_buffer.getvalue()
             self.done_callback(status, self.file_prefix, stdout)
         except Exception as ex:
-            ret_msg = f"An exception occurred during download {ex}"
+            ret_msg = f"An exception occurred during download {ex} \n\n{traceback.format_exc()}"
             logit(ret_msg)
             self.done_callback(1, self.file_prefix, ret_msg)
 
