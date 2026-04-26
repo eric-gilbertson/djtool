@@ -15,6 +15,7 @@ from tkinter import messagebox
 # Orville Peck & Margo Price - You're an Asshole
 # julia king - insomnia
 # Don Williams - Leaving Louisiana in Broad Daylight
+# Zach Bryan - Bad News 
 
 class FCCChecker():
     FCC_CLEAN = 'CLEAN'
@@ -112,7 +113,7 @@ class FCCChecker():
             # TODO check for artist match, e.g. steven stills season of the witch
             if song:
                 logit(f"Found song {song.title}: {song.api_path}, {have_artist}")
-                self.album = song.album.get('name', '') if have_artist else ''
+                self.album = song.album.get('name', '') if song.album and have_artist else ''
                 retval = song.lyrics
     
         except Exception as ex:
@@ -122,7 +123,9 @@ class FCCChecker():
     
     
     def explict_check(self):
-        BAD_WORDS = ["shit", "fuck", "asshole", 'nigger', "bullshit"]
+        BAD_WORDS = [ "asshole", "bullshit", "cocksucker", "cunt", "fuck", "fucker", \
+                      "fuckers", "motherfucker", "motherfuckers", "nigger", "piss", \
+                      "shit", "tits" ]
 
         self.fcc_status = self.FCC_NOT_FOUND
         if not self.artist or self.artist == '-' or not self.title or self.title == '-':

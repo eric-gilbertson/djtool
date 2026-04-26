@@ -884,7 +884,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         if SystemConfig.check_have_genius_key():
             for track in self.tree_datamap.values():
                 if not track.have_fcc_status() and not track.is_stop_file() and not track.is_spot_file():
-                    fcc_check = FCCChecker(track.get_primary_artist(), track.title)
+                    fcc_check = FCCChecker(track.get_primary_artist(), track.get_primary_title())
                     track.fcc_status = fcc_check.fcc_status
                     track.fcc_comment = fcc_check.explicit_msg
                     if fcc_check.album and not track.have_valid_album():
