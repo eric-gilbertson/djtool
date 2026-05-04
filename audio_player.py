@@ -19,6 +19,7 @@ class UpdaterThread(threading.Thread):
         self.start_event = threading.Event()
 
     def start_countdown(self, time_seconds):
+        logit(f"start_countdown: {time_seconds}")
         self.remaining = time_seconds
         self.stop_event.clear()
         self.start_event.set()
@@ -33,6 +34,7 @@ class UpdaterThread(threading.Thread):
                 self.root.set_countdown(f"{m:02}:{s:02}")
                 time.sleep(1)
 
+            logit(f"done_countdown {self.remaining}")
             self.root.set_title("")
             self.start_event.clear()
 

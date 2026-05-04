@@ -1,3 +1,4 @@
+import webbrowser
 from tkinter import ttk, simpledialog
 import tkinter as tk
 from fcc_checker import FCCChecker
@@ -217,6 +218,7 @@ class TrackEditDialog(simpledialog.Dialog):
         self.track_label = track.label if track.label else ''
         self.track_fcc_status = track.fcc_status
         self.track_fcc_comment = track.fcc_comment if track.fcc_comment else ''
+        self.track_song_url = track.song_url
         super().__init__(parent, "Edit Track")
 
 
@@ -230,7 +232,16 @@ class TrackEditDialog(simpledialog.Dialog):
         tk.Label(master, text="Album:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
         tk.Label(master, text="Label:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
         tk.Label(master, text="FCC:").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-        tk.Label(master, text=self.track_fcc_comment).grid(row=5, column=1, sticky="w", padx=0, pady=0)
+        link = tk.Label(master, text=self.track_song_url, fg='blue', cursor="hand2")
+        link.grid(row=5, column=1, sticky="w", padx=0, pady=0)
+        song_url = self.track_song_url if self.track_song_url else ''
+        if song_url:
+            have_prefix = self.track_song_url.startswith("http")
+            song_url = ("" if have_prefix else "https://") + self.track_song_url
+ 
+        link.bind("<Button-1>", lambda e : webbrowser.open_new(song_url))
+        tk.Label(master, text=self.track_fcc_comment).grid(row=6, column=1, sticky="w", padx=0, pady=0)
+
 
         # Create entry fields with initial values
         self.artist_entry = tk.Entry(master, width=40)

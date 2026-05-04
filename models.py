@@ -17,7 +17,7 @@ class Track():
 
     FCC_STATUS_IMAGE = {"CLEAN" : '✅', 'DIRTY': '⛔', 'NOT_FOUND': '✋'}
 
-    def __init__(self, id=-1, fcc_status='', fcc_comment='', artist='', title='', album='',  label='', file_path='', duration=0):
+    def __init__(self, id=-1, fcc_status='', fcc_comment='', artist='', title='', album='',  label='', file_path='', duration=0, song_url=''):
         super().__init__()
         self.id = id
         self.title = title if title else '-'
@@ -25,6 +25,7 @@ class Track():
         self.album = album if album else '-'
         self.label = label if label else '-'
         self.file_path = file_path
+        self.song_url = song_url
         self.duration = duration # seconds
         self.fcc_status = fcc_status if fcc_status else ''
         self.fcc_comment = fcc_comment if fcc_comment else ''
@@ -223,7 +224,7 @@ class ZKPlaylist():
         req.add_header("X-APIKEY", apikey)
         
         try:
-            with urllib.request.urlopen(req, data=data_json.encode('utf-8'), timeout=6, context=self.ssl_context) as response:
+            with urllib.request.urlopen(req, data=data_json.encode('utf-8'), timeout=30, context=self.ssl_context) as response:
                 resp_obj  = json.loads(response.read())
                 success = True
         except Exception as e:

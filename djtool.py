@@ -250,13 +250,14 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     fcc_check = FCCChecker(track.artist, track.title)
                     status = fcc_check.fcc_status
                     comment = fcc_check.explicit_msg
+                    song_url = fcc_check.song_url
                     #track.fetch_label() - requires spotify premium
     
                     # replace with the genius album if we don't have a good album name already.
                     if fcc_check.album and not track.have_valid_album():
                         track.album = fcc_check.album
                 
-                    self._insert_track(-1, status, comment, track.artist, track.title, track.album, track.label, track.file_path, True)
+                    self._insert_track(-1, status, comment, track.artist, track.title, track.album, track.label, track.file_path, True, song_url)
 
                 self.url.delete(0, "end")
                 self.url.update()
@@ -500,11 +501,11 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     def insert_pause(self):
         insert_index = self._get_selected_index()
-        self._insert_track(insert_index, '', '', '', Track.PAUSE_FILE, '', '', Track.PAUSE_FILE, True)
+        self._insert_track(insert_index, '', '', '', Track.PAUSE_FILE, '', '', Track.PAUSE_FILE, True, '')
 
     def insert_mic_break(self):
         insert_index = self._get_selected_index()
-        self._insert_track(insert_index, '','', '', Track.MIC_BREAK_FILE, '', '', Track.MIC_BREAK_FILE, True)
+        self._insert_track(insert_index, '','', '', Track.MIC_BREAK_FILE, '', '', Track.MIC_BREAK_FILE, True, '')
 
 
     def edit_selected_track(self):
@@ -736,7 +737,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 continue
 
             (artist, title, album) = self._get_track_info(path)
-            self._insert_track(insert_index, '', '', artist, title, album, '', path, file_count == 0)
+            self._insert_track(insert_index, '', '', artist, title, album, '', path, file_count == 0, '')
             insert_index += 1  # subsequent files go after
             file_count = file_count - 1
 
@@ -757,11 +758,11 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         return (artist, title, album)
 
 
-    def _insert_track(self, insert_index, fcc_status, fcc_comment, artist, title, album, label, path, update_list):
+    def _insert_track(self, insert_index, fcc_status, fcc_comment, artist, title, album, label, path, update_list, song_url):
         if insert_index == -1:
             insert_index = len(self.tree.get_children(""))
 
-        track = Track(-1, fcc_status, fcc_comment, artist, title, album, label, path, 0)
+        track = Track(-1, fcc_status, fcc_comment, artist, title, album, label, path, 0, song_url)
 
         tags = ()
         if track.is_mic_break_file():
@@ -881,19 +882,21 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     self.tree.item(track.id, values=row_values)
 
     def fcc_check(self):
-        if SystemConfig.check_have_genius_key():
-            for track in self.tree_datamap.values():
-                if not track.have_fcc_status() and not track.is_stop_file() and not track.is_spot_file():
-                    fcc_check = FCCChecker(track.get_primary_artist(), track.get_primary_title())
-                    track.fcc_status = fcc_check.fcc_status
-                    track.fcc_comment = fcc_check.explicit_msg
-                    if fcc_check.album and not track.have_valid_album():
-                        track.album = fcc_check.album
+        for track in self.tree_datamap.values():
+            if not track.have_fcc_status() and not track.is_stop_file() and not track.is_spot_file():
+                fcc_check = FCCChecker(track.get_primary_artist(), track.get_primary_title())
+                track.fcc_status = fcc_check.fcc_status
+                track.fcc_comment = fcc_check.explicit_msg
+                track.song_url = fcc_check.song_url
+                print(f"album: {fcc_check.album}")
+                if fcc_check.album and not track.have_valid_album():
+                    print("set album")
+                    track.album = fcc_check.album
 
-                    row_values = self.tree.item(track.id)["values"]
-                    row_values = (*row_values[0:5], track.fcc_status_glyph())
-                    self.tree.item(track.id, values=row_values)
-                    self._set_dirty(True)
+                row_values = self.tree.item(track.id)["values"]
+                row_values = (*row_values[0:5], track.fcc_status_glyph())
+                self.tree.item(track.id, values=row_values)
+                self._set_dirty(True)
 
             
     # import audio files from a directory.
@@ -926,7 +929,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                         continue
 
                 (artist, title, album) = self._get_track_info(file_path)
-                self._insert_track(-1, '', '', artist, title, album, '', file_path, False)
+                self._insert_track(-1, '', '', artist, title, album, '', file_path, False, '')
                 new_files = True
 
         if new_files:
@@ -1229,7 +1232,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
 
     def prepare_track_for_playback(self, track):
-        logit(f"prepare_track {track.title}")
+        logit(f"prepare_track: {track.title}, {track.duration}")
         self.tree.selection_set(track.id)
         self.tree.focus(track.id)
         self.tree.see(track.id)

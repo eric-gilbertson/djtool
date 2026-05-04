@@ -47,8 +47,9 @@ class YTDLPThread(threading.Thread):
                 'format': 'bestvideo+bestaudio/best',
                 'outtmpl': self.out_file,
                 'quiet': True,
+#                'cookiesfrombrowser': ('chrome',),
             }
-    
+
             # throttle downloads so we aren't flagged as an abuser
             if self.is_playlist:
                 ydl_opts['sleep_interval'] = 5,
