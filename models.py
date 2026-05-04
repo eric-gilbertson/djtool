@@ -40,8 +40,11 @@ class Track():
         dict = self.__dict__
         return dict
 
+    # treat ablum == title as false because YT incorrectly uses the
+    # song title as the album name. if the FCC check finds another name
+    # then we adopt it as the correct value.
     def have_valid_album(self):
-        result = self.album and self.album != '-'
+        result = self.album and self.album != '-' and self.album != self.title
         return result
 
     def reset(self):
