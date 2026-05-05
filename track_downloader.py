@@ -23,7 +23,7 @@ FIELD_SEPARATOR = '^'
 
 # downloads using the python library
 class YTDLPThread(threading.Thread):
-    def __init__(self, file_prefix, out_file, track_url, done_callback, audio_format, is_playlist):
+    def __init__(self, file_prefix, out_file, track_url, done_callback, audio_format, is_playlist, ffmpeg_path):
         super(YTDLPThread, self).__init__()
         self.done_callback = done_callback
         self.out_file = out_file
@@ -31,6 +31,7 @@ class YTDLPThread(threading.Thread):
         self.track_url = track_url
         self.is_playlist = is_playlist
         self.audio_format = audio_format
+        self.ffmpeg_path = ffmpeg_path
 
     def run(self):
         try:
@@ -47,13 +48,14 @@ class YTDLPThread(threading.Thread):
                 'format': 'bestvideo+bestaudio/best',
                 'outtmpl': self.out_file,
                 'quiet': True,
+                'ffmpeg_location' : self.ffmpeg_path,
 #                'cookiesfrombrowser': ('chrome',),
             }
 
             # throttle downloads so we aren't flagged as an abuser
             if self.is_playlist:
-                ydl_opts['sleep_interval'] = 5,
-                ydl_opts['max_sleep_interval'] = 10,
+                ydl_opts['sleep_interval'] = 5
+                ydl_opts['max_sleep_interval'] = 10
 
             ydl_opts['postprocessors'] = [{
                 'key': 'FFmpegExtractAudio',  # Correct key is essential
@@ -235,18 +237,22 @@ class TrackDownloader():
         elif use_fullname:
             self.track_url = track_specifier
 
-        if not ("youtube.com/watch?" in self.track_url or "youtube.com/playlist?" in self.track_url):
+        is_watch = "youtube.com/watch?" in self.track_url
+        is_playlist = "youtube.com/playlist?" in self.track_url
+        if not (is_watch or is_playlist):
             tk.messagebox.showwarning(title="Error", message=error_msg, parent=self.parent)
             return False
 
-        is_playlist = self.track_url.find('&list=') > 0
+        # watch is followed by playlist then remove the latter so that only one song is downloaded
+        if is_watch and (list_idx := self.track_url.find('&list=')) > 0:
+            self.track_url = self.track_url[0:list_idx]
+
         if is_playlist:
             msg = "This URL is for a playlist. Are you sure that you want to download the entire playlist?"
             if not tk.messagebox.askokcancel(title="Confirm Operation", message=msg, parent=self.parent):
                 return False
 
-
-        logit(f"start fetch & set cursor")
+        logit(f"start song download")
         self.parent.after(0, self.parent.set_cursor('clock'))
         self.is_done = False
 
@@ -267,7 +273,7 @@ class TrackDownloader():
             # NOTE: no ext here, the extension will be set by the library
             out_file = f'{dwnld_path}{artistTerm}_%(title)s'
             logit(f"Start internal download: {self.track_url}, {out_file}")
-            self.download_thread = YTDLPThread(dwnld_path, out_file, self.track_url, self.on_fetch_done, self.AUDIO_FORMAT, is_playlist)
+            self.download_thread = YTDLPThread(dwnld_path, out_file, self.track_url, self.on_fetch_done, self.AUDIO_FORMAT, is_playlist, self.FFMPEG_PATH)
             self.parent.after(0, self.download_thread.start)
             #self.download_thread.start()
 

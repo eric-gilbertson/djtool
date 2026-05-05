@@ -894,7 +894,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     track.album = fcc_check.album
 
                 row_values = self.tree.item(track.id)["values"]
-                row_values = (*row_values[0:5], track.fcc_status_glyph())
+                row_values = (*row_values[0:4], track.album, track.fcc_status_glyph())
                 self.tree.item(track.id, values=row_values)
                 self._set_dirty(True)
 
