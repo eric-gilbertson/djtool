@@ -173,7 +173,7 @@ class FCCChecker():
             song_artist = attrs['artistName']
             song_artist_lc = song_artist.lower()
             artist_match = artist_lc in song_artist_lc or song_artist_lc in artist_lc
-            song_title = attrs['name']
+            song_title = attrs['name'].strip()
             song_title_lc = song_title.lower()
             title_match =  title_lc in song_title_lc or song_title_lc in title_lc
             have_match = artist_match and title_match

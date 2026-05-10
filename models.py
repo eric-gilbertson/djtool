@@ -65,12 +65,12 @@ class Track():
     def get_primary_artist(self):
         delimiters = r'(\(|,|;| with | ft\. | featuring )'
         artist_ar = re.split(delimiters, self.artist)
-        return artist_ar[0]
+        return artist_ar[0].strip()
 
     def get_primary_title(self):
         delimiters = r'(\(|,|;| with | ft\. | featuring )'
         title_ar = re.split(delimiters, self.title)
-        return title_ar[0]
+        return title_ar[0].strip()
 
     # requires spotify premium account
     def fetch_label(self):
