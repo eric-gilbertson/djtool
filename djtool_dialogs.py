@@ -150,17 +150,20 @@ class UserConfigurationDialog(simpledialog.Dialog):
         self.show_start_combo = ttk.Combobox(master, state="readonly", width=15)
         self.show_start_combo.grid(row=row_num, column=1, sticky='w', padx=5, pady=5)
         time_values = [
-            '12 am', '1 am', '2 am', '3 am', '4 am', '5 am', '6 am', '7 am', '8 am', '9 am', '10 am', '11 am',
-            '12 pm', '1 pm', '2 pm', '3 pm', '4 pm', '5 pm', '6 pm', '7 pm', '8 pm', '9 pm', '10 pm', '11 pm',
+            'None', '12 am', '1 am', '2 am', '3 am', '4 am', '5 am', '6 am', '7 am', '8 am', '9 am', '10 am', '11 am',
+            '12 pm', '1 pm', '2 pm', '3 pm', '4 pm', '5 pm', '6 pm', '7 pm', '8 pm', '9 pm', '10 pm', '11 pm', 'None'
         ]
 
         self.show_start_combo['values'] = time_values
-        if UserConfiguration.show_start_time:
+        print(f"time {UserConfiguration.show_start_time}")
+        if UserConfiguration.show_start_time and UserConfiguration.show_start_time != 'None':
             time_ar = UserConfiguration.show_start_time.split(' ')
             hour = int(time_ar[0])
             hour = 0 if hour == 12 and time_ar[1] == 'am' else hour
             hour = hour + 12 if time_ar[1] == 'pm' and hour != 12 else hour
-            self.show_start_combo.set(time_values[hour])
+            self.show_start_combo.set(time_values[hour + 1])
+        else:
+            self.show_start_combo.set('None')
 
         row_num = row_num + 1
         tk.Label(master, text="User API Key:").grid(row=row_num, column=0, sticky="e", padx=5, pady=5)

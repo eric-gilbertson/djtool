@@ -10,7 +10,11 @@ ZOOKEEPER_TIMEOUT_SECONDS = 5
 def HMS_from_seconds(seconds):
     minutes, secs = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)
-    hms_str = f'{math.floor(hours):d}:{math.floor(minutes):02d}:{math.floor(secs):02d}'
+    if hours > 0:
+        hms_str = f'{math.floor(hours):d}:{math.floor(minutes):02d}:{math.floor(secs):02d}'
+    else:
+        hms_str = f'{math.floor(minutes):02d}:{math.floor(secs):02d}'
+
     return hms_str
 
 def seconds_from_HMS(time_hms):

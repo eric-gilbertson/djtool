@@ -102,8 +102,8 @@ class FCCChecker():
         return is_explicit
     
         
-    def confirm_song_match(self, found_artist):
-        msg = f"FCC check found lyrics for {self.title} by {found_artist} instead of {self.artist}. Is this the same song?"
+    def confirm_song_match(self, found_artist, found_title):
+        msg = f"FCC check found lyrics for {found_title} by {found_artist} instead of {self.title} by {self.artist}. Is this the same song?"
         return messagebox.askyesno("Confirm Lyrics", msg)
 
     def get_lyrics_genius(self):
@@ -119,12 +119,12 @@ class FCCChecker():
             song_artist_lc = song.artist.lower() if song else ''
             artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
             if song and not artist_match:
-                if not self.confirm_song_match(song.artist):
+                if not self.confirm_song_match(song.artist, song.title):
                     # rejected first choice so tray again with just the title
                     song = genius.search_song(title=self.title)
                     song_artist_lc = song.artist.lower() if song else ''
                     artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
-                    if song and not artist_match and not self.confirm_song_match(song.artist):
+                    if song and not artist_match and not self.confirm_song_match(song.artist, song.title):
                         song = None
     
             if song:
@@ -140,8 +140,11 @@ class FCCChecker():
 
     def get_lyrics(self):
         (url, lyrics, album) = self.get_lyrics_shazam()
-        if not url or not lyrics:
-            (url, lyrics, album) = self.get_lyrics_genius()
+        if not lyrics:
+            (genius_url, lyrics, genius_album) = self.get_lyrics_genius()
+            if lyrics:
+                url = genius_url
+                album = genius_album if genius_album else album
 
         return (url, lyrics, album)
 
@@ -153,6 +156,7 @@ class FCCChecker():
     def shazam_lookup(self):
         id = title = None
         artist_lc = self.artist.lower()
+        title_lc = self.title.lower()
         search_term=f"{self.artist} {self.title}"
         term_safe = urllib.parse.quote(search_term)
     
@@ -166,15 +170,20 @@ class FCCChecker():
             song = data[0]
             id = song['id']
             attrs = song['attributes']
-            song_artist = attrs['artistName'].lower()
-            have_match = artist_lc in song_artist or song_artist in artist_lc
-            if have_match or self.confirm_song_match(song_artist):
+            song_artist = attrs['artistName']
+            song_artist_lc = song_artist.lower()
+            artist_match = artist_lc in song_artist_lc or song_artist_lc in artist_lc
+            song_title = attrs['name']
+            song_title_lc = song_title.lower()
+            title_match =  title_lc in song_title_lc or song_title_lc in title_lc
+            have_match = artist_match and title_match
+            if have_match or self.confirm_song_match(song_artist, song_title):
                 album = attrs['albumName']
                 previews = attrs['previews']
                 url = attrs['url']
                 ALBUM_KEY = '/album/'
+                idx1 = url.find(ALBUM_KEY)
                 ALBUM_KEY_LEN = len(ALBUM_KEY)
-                idx1 = url.find(ALBUM_KEY) 
                 idx2 = url.find('/', idx1 + ALBUM_KEY_LEN + 1)
                 title = url[idx1+ALBUM_KEY_LEN : idx2]
                 album = album if have_match else ''
