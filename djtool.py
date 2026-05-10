@@ -371,7 +371,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.tree.heading("fcc", text="FCC")
 
         self.tree.tag_configure("pause", background="red")
-        self.tree.tag_configure("break", background="yellow")
+        self.tree.tag_configure("break", background="red")
 
         self.tree.column("num", width=25, anchor="center", stretch=False)
         self.tree.column("start_time", width=60, anchor="center", stretch=False)
@@ -565,11 +565,14 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
 
     def _renumber_rows(self):
-        start_time_secs = 0
+        start_time_secs = UserConfiguration.get_show_start_seconds()
+        display_track_duration = start_time_secs < 0
+
         for i, item_id in enumerate(self.tree.get_children(""), start=1):
             track = self.tree_datamap[item_id]
-            start_time_HMS = HMS_from_seconds(start_time_secs)
-            self.tree.item(item_id, values=(i, start_time_HMS, track.artist, track.title, track.album_display(), track.fcc_status_glyph()))
+            time_val_secs = track.duration if display_track_duration else start_time_secs
+            time_val_HMS = HMS_from_seconds(time_val_secs)
+            self.tree.item(item_id, values=(i, time_val_HMS, track.artist, track.title, track.album_display(), track.fcc_status_glyph()))
             start_time_secs = start_time_secs + track.duration
 
     def _delete_selected(self):
@@ -746,7 +749,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     def _get_track_info(self, file_path):
         artist = ''
         album = ''
-        title = os.path.basename(file_path[0:-4])
+        title = pathlib.Path(file_path).stem
         titleAr = title.split('^')
         if len(titleAr) > 1:
             artist = titleAr[0].strip()
@@ -763,14 +766,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             insert_index = len(self.tree.get_children(""))
 
         track = Track(-1, fcc_status, fcc_comment, artist, title, album, label, path, 0, song_url)
-
-        tags = ()
-        if track.is_mic_break_file():
-            tags = ("break")
-        elif track.is_pause_file():
-            tags = ("pause")
-
-        track.id = self.tree.insert("", insert_index, values=(insert_index+1, track.duration, artist, title, track.album_display(), track.fcc_status), tags=tags)
+        track.id = self.tree.insert("", insert_index, values=(insert_index+1, track.duration, artist, title, track.album_display(), track.fcc_status), tags=track.get_tags())
         self.tree_datamap[track.id] = track
     
         if update_list:
@@ -894,7 +890,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     track.album = fcc_check.album
 
                 row_values = self.tree.item(track.id)["values"]
-                row_values = (*row_values[0:5], track.fcc_status_glyph())
+                row_values = (*row_values[0:4], track.album, track.fcc_status_glyph())
                 self.tree.item(track.id, values=row_values)
                 self._set_dirty(True)
 
@@ -983,7 +979,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 t = self.tree_datamap[item]
                 tracks.append(t.to_dict())
                 file_name = os.path.basename(t.file_path).lower()
-                if t.is_audio_file():
+                if t.is_readback_file():
                    include_timestamps = True
 
             if include_timestamps:
@@ -992,6 +988,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
                 if not tk.messagebox.askokcancel(title="Confirm Show Start Time", message=msg, parent= self):
                     return
+
+                # just in case user left start time as None
+                time_secs = 0 if time_secs < 0 else time_secs
 
             # write app playlist
             with open(fp, 'w', encoding='utf-8') as json_file:
@@ -1010,7 +1009,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 if include_timestamps:
                     zk_track_start = f'{track_start}\n'
 
-                if t.is_audio_file() or t.is_mic_break_file() or t.is_pause_file():
+                if t.is_readback_file() or t.is_mic_break_file() or t.is_pause_file():
                     # zookeeper needs all blanks for a break
                     zk_line = f"\t\t\t\t\t{zk_track_start}"
                 else:
@@ -1079,27 +1078,25 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.set_title()
 
     def import_json(self, fp):
-        total_secs = 0
-        idx = 1
-
         if not os.path.exists(fp):
             logit(f'File does not exist {fp}')
             return
 
-        start_hour = 0
-        if start_hour >= 0:
-            total_secs = start_hour * 60 * 60
-
         logit(f"Start JSON import from: {fp}")
+        start_time_secs = UserConfiguration.get_show_start_seconds()
+        display_track_duration = start_time_secs < 0
+
         try:
+            total_secs = start_time_secs
             with open(fp, 'r') as file:
                 track_objs = json.load(file)
                 idx = 1
                 for track_obj in track_objs:
                     track = Track.from_dict(track_obj)
                     if track and track.duration == 0 or os.path.exists(track.file_path):
-                        track_start = HMS_from_seconds(total_secs)
-                        track.id = self.tree.insert("", "end", values=(idx, track_start, track.artist, track.title, track.album, track.fcc_status_glyph()))
+                        time_val = track.duration if display_track_duration else total_secs
+                        time_val_hms  = HMS_from_seconds(time_val)
+                        track.id = self.tree.insert("", "end", values=(idx, time_val_hms, track.artist, track.title, track.album, track.fcc_status_glyph()), tags=track.get_tags())
                         self.tree_datamap[track.id] = track
                         total_secs = total_secs + track.duration
                         idx = idx + 1

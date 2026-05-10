@@ -65,12 +65,12 @@ class Track():
     def get_primary_artist(self):
         delimiters = r'(\(|,|;| with | ft\. | featuring )'
         artist_ar = re.split(delimiters, self.artist)
-        return artist_ar[0]
+        return artist_ar[0].strip()
 
     def get_primary_title(self):
         delimiters = r'(\(|,|;| with | ft\. | featuring )'
         title_ar = re.split(delimiters, self.title)
-        return title_ar[0]
+        return title_ar[0].strip()
 
     # requires spotify premium account
     def fetch_label(self):
@@ -85,12 +85,21 @@ class Track():
         glyph = self.FCC_STATUS_IMAGE.get(self.fcc_status, self.fcc_status)
         return glyph
 
+    # returns tuple that is used to style treeview rows
+    def get_tags(self):
+        if self.is_mic_break_file():
+            return ("break")
+        elif self.is_pause_file():
+            return ("pause")
+        else:
+            return ()
+
     def is_spot_file(self):
         is_spot = self.file_path.startswith("LID_") or self.file_path.startswith('PSA_') or self.file_path.startswith("PROMO_")                 
         return is_spot
                 
-    def is_audio_file(self):
-        is_audio = re.search('audio[0-9]+\\.', self.file_path)
+    def is_readback_file(self):
+        is_audio = re.search('readback[0-9]+\\.', self.file_path)
         return is_audio
 
     def is_stop_file(self):
@@ -359,6 +368,10 @@ class UserConfiguration():
     @staticmethod
     def get_show_start_seconds():
         seconds = 0
+
+        if UserConfiguration.show_start_time == 'None':
+            return -1
+        
         time_ar = UserConfiguration.show_start_time.split(' ')
         if len(time_ar) == 2:
             suffix = time_ar[1]
