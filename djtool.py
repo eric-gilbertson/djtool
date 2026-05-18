@@ -78,18 +78,20 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 "tk::mac::ReopenApplication",
                 self.on_dock_reopen
             )
-
-            # if invoked from the desktop then the PATH will be limited so we append
-            # the expected locations for yt-dlp and ffmpeg.
-            EXTRA_PATHS = [ "/opt/local/bin", "/usr/local/bin", "/opt/homebrew/bin"]
-            current_path = os.environ.get("PATH", "")
-            if EXTRA_PATHS[0] not in current_path:
-               logit("adding extra paths to PATH")
-               os.environ["PATH"] = ":".join(EXTRA_PATHS + [current_path])
         elif platform.system() == 'Windows':
             full_path = f"{self.get_resources_dir()}/djtool.ico"
             self.iconbitmap(full_path)
           
+        # if no user installed version then use the bundled version.
+        ffmpeg_name = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
+        self.FFMPEG_PATH = shutil.which(ffmpeg_name)
+        if not self.FFMPEG_PATH and self.is_appbundle:
+            current_path = os.environ.get("PATH", "")
+            helper_dir = f"{self.get_resources_dir()}/helpers"
+            logit(f"FFMPEG not found, adding helper dir to path {helper_dir}")
+            os.environ["PATH"] = f"{current_path}:{helper_dir}"
+            self.FFMPEG_PATH = f"{helper_dir}/{ffmpeg_name}"
+
         self.DEFAULT_TITLE = "DJ Tool"
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.log_window = None
@@ -106,7 +108,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         # ----- State -----
         self._track_id = ''
         self.live_show = tk.BooleanVar()
-        self.downloader = TrackDownloader(self, DJT_DOWNLOAD_DIR)
+        self.downloader = TrackDownloader(self, DJT_DOWNLOAD_DIR, self.FFMPEG_PATH)
         UserConfiguration.load_config()
         SystemConfig.load_config(UserConfiguration.user_apikey)
 
@@ -372,6 +374,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
         self.tree.tag_configure("pause", background="red")
         self.tree.tag_configure("break", background="red")
+        self.tree.tag_configure("active_track", background="lightgray")
 
         self.tree.column("num", width=25, anchor="center", stretch=False)
         self.tree.column("start_time", width=60, anchor="center", stretch=False)
@@ -699,6 +702,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self._hide_insert_line()
         self._renumber_rows()
 
+        # leave for a bit so user has visual feedback then clear.
+        self.after(500, lambda: self.tree.selection_set(()))
+
     # ======================= EXTERNAL DROP (Finder) =======================
     def _on_drag_motion_external(self, event):
         """While dragging from Finder, show insertion line."""
@@ -897,20 +903,27 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             
     # import audio files from a directory.
     def import_audio_files(self):
+        audio_files = None
         home_dir = expanduser("~")
-        dir_path = filedialog.askdirectory( title="Add wav/mp3 files from directory",
-            initialdir=home_dir)
+        msg = "Would you like to import individual audio files or all files from a  folder?"
+        dialog = CTkMessagebox(title="Audio Import", message=msg, icon="question", option_1="Files", option_2="Directory", option_3="Cancel")
+        answer = dialog.get()
 
-        if not dir_path:
+        if answer == 'Files':
+            audio_files = filedialog.askopenfilenames(title="Select import files", initialdir=home_dir, filetypes=[("Audio", "*.opus *.mp3 *.wav")])
+        elif answer == 'Directory':
+            dir_path = filedialog.askdirectory( title="Add wav/mp3 files from directory", initialdir=home_dir)
+            audio_files = glob.glob(dir_path + "/*.mp3") +  \
+                      glob.glob(dir_path + "/*.wav") + \
+                      glob.glob(dir_path + "/*.opus")
+
+        if not audio_files:
             return
 
         current_files = []
         for track in self.tree_datamap.values():
             current_files.append(track.file_path)
 
-        audio_files = glob.glob(dir_path + "/*.mp3") +  \
-                      glob.glob(dir_path + "/*.wav") + \
-                      glob.glob(dir_path + "/*.opus")
         new_files = False
         WAV_CHECK_SIZE = 100000000
         MP3_CHECK_SIZE = 10000000
@@ -1118,13 +1131,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             self.stop_audio()
         else:
             logit("play from pause")
-            # if there is a user selection then play from it, else continue from
-            # last track played, e.g. hit pause & no continue
-            if len(self.tree.selection()) > 0:
-                self.play_selected()
-            else:
-                next_track = self.get_next_track_for_playback(self._track_id)
-                self._play_track_from_id(next_track.id)
+            next_track = self.get_next_track_for_playback(self._track_id)
+            self._play_track_from_id(next_track.id)
+
 
     def live_show_change(self):
         if self.live_show.get():
@@ -1196,6 +1205,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     def play_selected(self):
         row_id = self.tree.selection()[0]
+        self.tree.selection_set(()) # clear selection so that tree row shows is_playing styling
+
         if len(row_id) > 0:
             track = self.tree_datamap[row_id]
             if track.is_stop_file():
@@ -1230,9 +1241,11 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     def prepare_track_for_playback(self, track):
         logit(f"prepare_track: {track.title}, {track.duration}")
-        self.tree.selection_set(track.id)
-        self.tree.focus(track.id)
-        self.tree.see(track.id)
+        if self._track_id:
+            old_track = self.tree_datamap[self._track_id]
+            self.tree.item(self._track_id, tags=old_track.get_tags())
+
+        self.tree.item(track.id, tags=('active_track',))
         idx = self.tree.index(track.id)
         title_msg = f"{idx+1}: {track.artist} - {track.title}"
         self.set_title(title_msg)

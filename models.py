@@ -59,7 +59,7 @@ class Track():
         self.duration = 0
 
     def album_display(self):
-        retval =  f'{self.album} / {self.label}'
+        retval =  f'{self.album} / {self.label}' if len(self.label) > 2 else self.album
         return retval
 
     def get_primary_artist(self):

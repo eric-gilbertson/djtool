@@ -102,18 +102,15 @@ class TrackDownloader():
     YTDWNLD_PREFIX = 'YTDLPDWNLD-'
     YTDWNLD_PREFIX_END_CHAR = '_'
      
-    def __init__(self, parent, download_dir):
+    def __init__(self, parent, download_dir, ffmpeg_path):
+        self.FFMPEG_PATH = ffmpeg_path
+
         # use user installed verion if available, else use bundled version if availabe.
         self.YTDL_PATH = shutil.which('yt-dlp')
         if not self.YTDL_PATH and platform.system() == 'Darwin' and os.path.exists(self.YTDL_ALT_PATH_MACOS):
             self.YTDL_PATH = self.YTDL_ALT_PATH_MACOS
 
-        FFMPEG_NAME = "ffmpeg.exe" if platform.system() == "Windows" else "ffmpeg"
-        self.FFMPEG_PATH = shutil.which(FFMPEG_NAME)
-        if not self.FFMPEG_PATH and parent.is_appbundle:
-            self.FFMPEG_PATH = f"{parent.get_resources_dir()}/helpers/{FFMPEG_NAME}"
-
-        logit(f"Helper paths: -{self.YTDL_PATH}-, -{self.FFMPEG_PATH}-")
+        logit(f"yt-dlp path: -{self.YTDL_PATH}-")
         self.download_dir = download_dir
         self.parent = parent
         self.download_thread = None
@@ -203,6 +200,10 @@ class TrackDownloader():
 
     def fetch_track(self, parent, track_specifier, use_fullname):
         logit(f"Enter fetch_track: {track_specifier}")
+        if not self.FFMPEG_PATH:
+            tk.messagebox.showwarning(title="Error", message="FFMPEG was not found and it is required to download songs. Please install it and try again.", parent=self.parent)
+            return False
+
         is_url = 'https:/' in track_specifier
         ARTIST_TRACK_SEPARATOR = r' - |;|\t' # split on -, ; and <tab>
         artistTerm = '%(artist)s' if use_fullname  else 'UNKNOWN'
@@ -290,14 +291,12 @@ class TrackDownloader():
             for new_file in new_files:
                 logit(f"Downloaded file: {new_file}")
                 (file_path, file_artist, file_title) = self.clean_filepath(new_file)
-                if trim_audio(file_path):
-                    # use the title/artist from the downloaded iff it has not already been set.
-                    artist = self.track.artist if self.track.artist else file_artist
-                    title = self.track.title if self.track.title else file_title
-                    track = Track(1, '', '', artist, title, self.track.album,  '', file_path, 0)
-                    self.tracks.append(track)
-                else:
-                    self.err_msg = f"Download file is corrupt or does not exist -{new_file}-. {stdOut}"
+                trim_audio(file_path)
+                # use the title/artist from the downloaded iff it has not already been set.
+                artist = self.track.artist if self.track.artist else file_artist
+                title = self.track.title if self.track.title else file_title
+                track = Track(1, '', '', artist, title, self.track.album,  '', file_path, 0)
+                self.tracks.append(track)
 
         self.is_done = True
 
