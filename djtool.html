@@ -22,9 +22,9 @@ DJ Tool is a music download and playlist management tool that is optimized for t
 The following steps describe how to use DJTool for live shows. Note that songs can be downloaded while the show is in progress.
 
 <li>Use Zookeeper to create an empty playlist for your show</li>
-<li>Start app using Mac's Spotlight launcher, e.g.Cmd-&lt;space&gt; and enter DJTool</li>
+<li>Start app using Mac's Spotlight launcher, e.g.Cmd-&lt;SPACE&gt; and enter DJTool</li>
 <li>Click Live Show box and enter show name and click OK</li>
-<li>Download songs by entering  &lt;ARTIST_NAME&gt;;&lt;SONG_TITLE&gt; into the Song field and clicking Fetch</li>
+<li>Download songs by entering  &lt;ARTIST_NAME&gt; ; &lt;SONG_TITLE&gt; into the Song field and clicking Fetch</li>
 <li>Start playback by double clicking the 1st song in the track list</li>
 <li>Use Edit->Insert Mic-Break (or Pause) and drag it below the last song in set</li>
 <li>Download tracks for next set</li>
@@ -37,13 +37,13 @@ The following steps describe how to use DJTool for live shows. Note that songs c
 
 <h3> Quickstart Hints</h3>
 <li>If song search fails, use direct entry of the YouTube video URL</li>
-<li>Entering &lt;Space&gt; toggles between play and pause modes</li>
+<li>Entering &lt;SPACE&gt; toggles between play and pause modes</li>
 <li>Songs can be downloaded during playback</li>
 <li>Fast switch to another track by double clicking it</li>
-<li>Each track spin will be automatically add to you Zookeeper playlist</li>
+<li>Each track spin will be timestamped and appended to your show playlist</li>
 <li>Track information can be edited by Shift-Clicking the song row</li>
-<li>Mic-Break stops playback and inserts a break line in Zookeeper</li>
-<li>Pause stops playback and does NOT add a Zookeeper break line</li>
+<li>Mic-Break stops playback and inserts a break line in your playlist</li>
+<li>Pause stops playback and does NOT add a playlist break line</li>
 
 <h2>Adding Songs</h2>
 
@@ -55,19 +55,19 @@ Songs can be added to the playlist through the following actions:
 <li> Dragging a local audio file into DJTool</li>
 </ul>
 
-Songs are downloaded from YouTube by entering the URL of a video page or by entering the song info as  &lt;ARTIST_NAME&gt; ;  &lt;SONG_TITLE&gt; into the URL input field and clicking Fetch or entering &lt;Enter&gt;. After 10s delay, a  broadcast ready (no ads and leading/trailing silence trimmed to 2 seconds) copy of the track will be added to your local drive as a wav file and appended to the playlist. Note that it is not necessary to enter full artist and title names. Entering enough of it to identify the song is sufficient, e.g "cliff; harder" would download Jimmy Cliff's great song.  If the song search returns multiple results, then a song a choice picker will be presented.  Note that you must install the yt-dlp open source application in order to use this feature, as described in the setup section. In order to accommodate copy/pasting of artist/sing from outside playlists, the URL input field also accepts tab and - as field  separaters.
+Songs are downloaded from YouTube by entering the URL of a video page or by entering the song info as  &lt;ARTIST_NAME&gt; ;  &lt;SONG_TITLE&gt; into the URL input field and clicking Fetch or entering &lt;ENTER&gt;. After short delay, a  broadcast ready (no ads and leading/trailing silence trimmed to 2 seconds) copy of the track will be added to your local drive as a opus file and appended to the playlist. Note that it is not necessary to enter full artist and title names. Entering enough of it to identify the song is sufficient, e.g "cliff; harder" would download Jimmy Cliff's great song.  If the song search returns multiple results, then a song a choice picker will be presented.  In order to accommodate copy/pasting of artist/ssong from outside playlists, the URL input field also accepts TAB and - as field  separaters.
 
 The album will be added to the playlist when downloading with the artist/title input format but not for downloads using the video URL. For the latter, the album titles can be found with the Find Albums feature.
 
 Local files can be added to your playlist by using the Finder application to drag the files into the list display area of the tool. 
 
 <h2>Importing Local Audio Files</h2>
-The import audio function imports external song files into the playlist. It activates a file / folder  selection dialog. If a folder is selected then all audio files under it will be imported. Alternatively, individual audio files can be selected for import. Note that the external files will not be deleted upon playlist deletion, e.g. deletion only removes downloaded files.
+The import audio function imports external song files into the playlist. It activates a file / folder  selection dialog. If a folder is selected then all audio files under it will be imported. Alternatively, individual audio files can be selected for import. Note that the external files will not be deleted upon playlist deletion, e.g. deletion removes only downloaded files.
 
 
 <h2> Editing Track Information</h2>
 
-Playlist track info can be modified selecting a track by clicking on it and then activating Edit->Edit Track function (or using the Shift-Click accelerator) and updating the track information in the Edit Track pop dialog. If the FCC status is changed from DIRTY to CLEAN, e.g. after removing any offending language, then '(CLEAN)' will be appended to the track title as a reminder of the change.
+Playlist track info can be modified selecting a track by clicking on it and then chosing the Edit->Edit Track function (or by doing a Shift-Click on directly the target track) and updating the track information in the Edit Track pop dialog. If the FCC status is changed from DIRTY to CLEAN, e.g. after removing any offending language, then '(CLEAN)' will be appended to the track title as a reminder of the change. Note that the the edit dialog provides a link to the song lyrics page and a summary of any explitives, e.g. shit 3x.
 
 
 <h2> Playlist Load and Save/Update</h2>
@@ -85,7 +85,7 @@ Unlike the save operation, which prompts for a new playlist name, the update ope
 
 
 <h2> Explicit Language Checking</h2>
-Playlist tracks can be checked for the presence of FCC language violations with the File->FCC Check function.This operation searches for song lyrics and checking them for offensive words and assigns one of the following values to each track: CLEAN, DIRTY, and NOT_FOUND which are displayed as green, red and yellow icons the the track list (as well as '-' for tracks have not been checked).
+Upon song download, DJTool attempts to find the song lyrics and if found checks for potential FCC violations by looking for explitives and displaying a green, yellow or red icon (CLEAN, DIRTY, and NOT_FOUND) in the song row. If the lyrics cannot be found it may be be that the artist name of song title are misspelled. In this case you can rerun the check by correcting the typos using the track edit dialog and setting the FCC status to '-' and then clicking File->FCC Check in order to rescan all songs with a '-' FCC status.
 
 The File->Export MP3 function provides an option to export only the NOT_FOUND tracks for easy sound checking and the File->FCC Unknown Clear can be used to change all NOT_FOUND tracks to CLEAN status.
 
@@ -102,24 +102,21 @@ The Live Show option enables automatic submission of track spins to Zookeeper as
 Note that the show info entered into DJTool must match the playlist that you created in Zookeeper. Upon saving a confirmation will be dislayed if a corresponding Zookeeper playlist was ffound.
 
 <h2> User Configuration</h2>
-This function activates the configuration dialog for entering show information such as title and start time. Start time should be set when creating prerecorded shows as this is the show start time that is used to timestamp your Zookeeper playlists. Start time should be set to None (default) for live shows. Note that the display time column will show that song length for live shows and the song start time for prerecorded shows.
+This function activates the configuration dialog for entering show your show title and start time. Start time should be set when creating prerecorded shows as this is the show start time that is used to timestamp your Zookeeper playlists. Start time should be set to None (default) for live shows. Note that the display time column will show that song length for live shows and the song start time for prerecorded shows.
 
-
-<h2> Find Albums</h2>
-This function looks up the album titles(s) from the artist and tile names. If multiple albums are found then a selection dialog will be presented. 
 
 <h2> Mic-Break and Pause Tracks</h2>
-These tracks are used to automatically pause playback in preparation for a mic break or for playing a song from an external source like a CD. Once paused, the playback can be continued by tapping the space key. Pausing with mic-break will add mic-break line to your Zookeeper playlist, while pause simply pauses playback for cases in which the DJ wants to manually enter the next track into Zookeeper.
+These tracks are used in live shows to automatically pause playback in preparation for a mic break or for playing a song from an external source like a CD. Once paused, the playback can be continued by tapping the space key. Pausing with MIC-BREAK will add mic-break entry to your playlist, while PAUSE simply pauses playback for cases in which the DJ wants to manually enter the next track into Zookeeper.
 
 <h2> Readback Files</h2>
-If a show contains DJ voice work, these files should be named READBACK_&LT;BREAK_NUMBER&GT;, e.g. READBACK_1, as this is a trigger to DJTool to emit voice break lines to Zookeeper when played and to include timestamps in the Zookeeper CSV file. If this feature is not desired then the voice files can be arbitrarily named.
+If a prerecorded show contains DJ voice work, these files should be named READBACK_&LT;BREAK_NUMBER&GT;, e.g. READBACK_1, as this is a trigger to DJTool to emit voice break lines to Zookeeper when played and to include timestamps in the Zookeeper CSV file. If this feature is not desired then the voice files can be arbitrarily named.
 
 
 <h2> Zookeeper Playlist Generation</h2>
 Upon playlist saves, DJTool creates a Zookeeper specific CSV file that can be used to import the show tracks using ZK's Import function. These files can imported by clicking the Import link on the Zookeeper homepage and following the directions for CSV file import.
 
 <h2> MP3 Export (File->Export MP3)</h2>
-This function generates an MP3 representation of the entire program that is suitable for show upload. Because this operation requires converting WAV files to MP3 format, the process takes approximately 5 minutes for a 1 hour show.
+This function generates an MP3 representation of the entire program that is suitable for show upload. Because this operation requires converting OPUS files to MP3 format, the process takes approximately 5 minutes for a 1 hour show.
 
 <h2> Output Channel Picker</h2>
 This picker selects the output device used when playing tracks. The output can be directed to the board's Aux Codec input by connecting it to your laptop and selecting using this control.
@@ -131,46 +128,35 @@ The following keyboard shortcuts can be used to invoke common operations:
 <ul>
 <li>   &lt;SPACE&gt; - toggles between play and pause modes</li>
 <li>   &lt;DELETE&gt; - deletes the selected playlist entries </li>
-<li>   &lt;Shift-Click&gt; - invokes track editor for the target track</li>
+<li>   &lt;SHIFT-CLICK&gt; - invokes track editor for the target track</li>
 <li>   &lt;DOUBLE-CLICK&gt; - starts playback on the target file</li>
 <li>   &lt;ENTER&gt; - initiates song download (when entered into the URL input field</li>
 <li>   &lt;DRAG_DROP&gt; - imports external files that are dragged from 'finder' tools</li>
-<li>   &lt;Click-Drag&gt; - relocates track position within the playlist</li>
+<li>   &lt;CLICK-DRAG&gt; - relocates song's  position within the playlist</li>
 </ul>
 
 All other DJTool functions are invoked via the application menu bar 
 
 <h2> FAQ</h2>
-<br>
 > What are the supported audio file formats
 <br>
 # DJTool supports opus, mp3 and wav files
 <br>
-
-<br>
 > Can I download songs while playback is running
 <br>
 # Yes.
-
 <br>
 > Where are downloaded files located
 <br>
 # Files are downloaded to the djtool/active folder under the Music directory
-
 <br>
 > Is there a warning when quitting with outstanding playlist edits
 <br>
 # Yes
-
 <br>
 > FCC check does not find a song that exists in Genius.com
 <br>
 # Check the artist name and track title spellings
-
-<br>
-> Where can I find a cheat sheet for yt-dlp options?
-<br>
-# https://www.ditig.com/yt-dlp-cheat-sheet
 
 
 
