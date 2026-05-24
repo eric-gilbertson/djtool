@@ -33,6 +33,7 @@ import sounddevice as sd
 from tkinter import PhotoImage
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 
+from concurrent.futures import ThreadPoolExecutor
 from CTkMessagebox import CTkMessagebox
 from pydub import AudioSegment
 from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -1143,10 +1144,11 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             else:
                 self.clear_live_show()
         else:
-            pass #self.playlist.id = None
+            self.clear_live_show()
 
     def clear_live_show(self):
         self.live_show.set(False)
+        self.playlist.id = None
 
     def check_show_playlist(self, show_title):
         if not self.playlist.check_show_playlist(show_title):
@@ -1250,8 +1252,16 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         title_msg = f"{idx+1}: {track.artist} - {track.title}"
         self.set_title(title_msg)
         self._track_id = track.id
-        spin_thread = threading.Thread(target=self.playlist.send_track, args=(track, False))
-        spin_thread.start()
+        
+        if self.playlist.id:
+            with ThreadPoolExecutor() as executor:
+                try:
+                    future = executor.submit(self.playlist.send_track,track, False)
+                    if not future.result():
+                        print("set error")
+                        self.set_title(f"Error posting spin for {track.title}")
+                except Exception as ex:
+                    logit(f"Exception posting spin for: {track.title}, {ex}")
 
     def get_next_track_for_playback(self, cur_track_id):
         next_track = None

@@ -164,42 +164,72 @@ class ZKPlaylist():
 
         return is_active
 
-#    def send_track_zookeeper(self, track):
-#        if not self.id or not self._is_active() or track.is_pause_file() or track.title.startswith("LID_"):
-#            logit(f"skip send_track {self.id}, {self._is_active()}")
-#            return
-#
-#        url = SystemConfig.zookeeper_host + f'/api/v2/playlist/{self.id}/events'
-#        method = "POST"  # timestamp this track
-#        event_type = 'break' if track.is_mic_break_file() else 'spin'
-#        event = {
-#            "type": "event",
-#            "attributes": {
-#                "type": event_type,
-#                "created": "auto",
-#                "artist": track.artist,
-#                "track": track.title,
-#                "album": track.album,
-#                "label": '-'
-#            }
-#        }
-#
-#        data = {"data": event}
-#        data_json = json.dumps(data)
-#        req = urllib.request.Request(url, method=f'{method}')
-#        req.add_header("Content-type", "application/vnd.api+json")
-#        req.add_header("Accept", "text/plain")
-#        req.add_header("X-APIKEY", SystemConfig.zookeeper_apikey)
-#
-#        try:
-#            with urllib.request.urlopen(req, data=data_json.encode('utf-8'), timeout=ZOOKEEPER_TIMEOUT_SECONDS,
-#                                        context=self.ssl_context) as response:
-#                resp_obj = json.loads(response.read())
-#        except Exception as e:
-#            logit(f"Exception posting track: {url}, {e}")
-
-
     def send_track(self, track, skip_active_check):
+        if not self.id:
+            return False
+        elif SystemConfig.use_proxy:
+            gotit = self.send_track_proxy(track, skip_active_check)
+        else:
+            gotit = self.send_track_zookeeper(track, skip_active_check)
+
+        return gotit
+
+    # sends track spin to the to zookeeper.
+    # NOTE: behavior & signature must match send_track_proxy
+    def send_track_zookeeper(self, track, skip_active_check):
+        gotit = False
+        if not self.id:
+            return False # function is disabled
+
+        print(f"enter send_track_zookeeper {track.title}")
+        apikey = UserConfiguration.playlist_apikey
+        doit = (skip_active_check or self._is_active()) and apikey and \
+               not track.is_pause_file() and not track.is_spot_file()
+        if not doit:
+            logit(f"skip send_track {self.id}, {self._is_active()}")
+            return False
+
+
+        url = SystemConfig.zookeeper_host + f'/api/v2/playlist/{self.id}/events'
+        method = "POST"  # timestamp this track
+        event_type = 'break' if track.is_mic_break_file() else 'spin'
+        attrs = {
+            "type": event_type,
+            "created": "auto",
+            "artist": track.artist,
+            "track": track.title,
+            "album": track.album,
+            "label": '-'
+        }
+
+        if not skip_active_check:
+            attrs["created"] = "auto"
+
+        data = {"data": {
+            "type": "event",
+            "attributes": attrs
+            }
+        }
+        data_json = json.dumps(data)
+        req = urllib.request.Request(url, method=f'{method}')
+        req.add_header("Content-type", "application/vnd.api+json")
+        req.add_header("Accept", "text/plain")
+        req.add_header("X-APIKEY", apikey)
+
+        try:
+            with urllib.request.urlopen(req, data=data_json.encode('utf-8'), timeout=30,
+                                        context=self.ssl_context) as response:
+                resp_obj = json.loads(response.read())
+                gotit = True
+        except Exception as e:
+            logit(f"Exception posting track: {url}, {e}")
+
+        return gotit
+
+
+    # sends track spin to the to zookeeper via a proxy
+    # NOTE: behavior & signature must match send_track_zookeeper
+    def send_track_proxy(self, track, skip_active_check):
         if not self.id:
             return # function is disabled
 
@@ -240,12 +270,25 @@ class ZKPlaylist():
                 resp_obj  = json.loads(response.read())
                 success = True
         except Exception as e:
-            logit(f"Exception posting track: {url}, {e}")
+            msg = f"Exception posting track: {url}, {e}"
+            logit(msg)
+
 
         return success
 
 
     def check_show_playlist(self, target_title):
+        if SystemConfig.use_proxy:
+            is_good = self.check_show_playlist_proxy(target_title)
+        else:
+            is_good = self.check_show_playlist_zookeeper(target_title)
+
+        return is_good
+
+
+    # returns true if there is a playlist that matches target_title
+    # NOTE: must match behavior of check_show_playlist_zookeeper()
+    def check_show_playlist_proxy(self, target_title):
         apikey = UserConfiguration.user_apikey
         playlist_apikey = UserConfiguration.playlist_apikey
         if not apikey or not playlist_apikey:
@@ -293,36 +336,46 @@ class ZKPlaylist():
 
         return self.id != None
 
-#    def check_show_playlist_zookeeper(self, target_title):
-#        self.id = None
-#        now_date = datetime.datetime.now().date().isoformat()
-#        url = SystemConfig.zookeeper_host + f'/api/v2/playlist?filter[date]={now_date}'
-#
-#        try:
-#            target_title_lc = target_title.lower()
-#            with urllib.request.urlopen(url, timeout=ZOOKEEPER_TIMEOUT_SECONDS, context=self.ssl_context) as response:
-#                playlists  = json.loads(response.read())['data']
-#                for  playlist in playlists:
-#                     attrs = playlist['attributes']
-#                     if attrs['name'].lower() == target_title_lc:
-#                         self.id = playlist['id']
-#                         time_ar = attrs['time'].split('-')
-#                         self.start_hour = float(time_ar[0][:2]) + (int(time_ar[0][2:4]) / 60.0)
-#                         self.end_hour = float(time_ar[1][:2]) + (int(time_ar[1][2:4]) / 60.0)
-#                         start_str = self.HM_from_float(self.start_hour)
-#                         end_str = self.HM_from_float(self.end_hour)
-#                         msg = f'Playlist found. Track spins will be logged to your show between {start_str} and {end_str}, {self.id}'
-#                         tk.messagebox.showwarning(title="Info", message=msg)
-#                         break
-#                      
-#        except Exception as e:
-#            logit(f"Exception getting playlist: {url}, {e})")
-#
-#        if not self.id:
-#            self.parent.live_show.set(False)
-#            tk.messagebox.showwarning(title="Error", message=f"Zookeeper playlist '{target_title}' not found.", parent=self.parent)
-#          
-#        return self.id != None
+    # returns true if there is a playlist that matches target_title
+    # NOTE: must match behavior of check_show_playlist_proxy()
+    def check_show_playlist_zookeeper(self, target_title):
+        self.id = None
+        now_date = datetime.datetime.now().date().isoformat()
+        url = SystemConfig.zookeeper_host + f'/api/v2/playlist?filter[date]={now_date}'
+
+        try:
+            target_title_lc = target_title.lower()
+            with urllib.request.urlopen(url, timeout=30, context=self.ssl_context) as response:
+                playlists  = json.loads(response.read())['data']
+                for  playlist in playlists:
+                     attrs = playlist['attributes']
+                     if attrs['name'].lower() == target_title_lc:
+                         self.id = playlist['id']
+                         time_ar = attrs['time'].split('-')
+                         self.start_hour = float(time_ar[0][:2]) + (int(time_ar[0][2:4]) / 60.0)
+                         self.end_hour = float(time_ar[1][:2]) + (int(time_ar[1][2:4]) / 60.0)
+                         start_str = self.HM_from_float(self.start_hour)
+                         end_str = self.HM_from_float(self.end_hour)
+                         break
+                      
+        except Exception as e:
+            logit(f"Exception getting playlist: {url}, {e})")
+
+        if not self.id:
+            self.parent.live_show.set(False)
+            tk.messagebox.showwarning(title="Error", message=f"Zookeeper playlist '{target_title}' not found.", parent=self.parent)
+        else:
+            # send test track to check writability
+            test_track = Track()
+            test_track.title = Track.MIC_BREAK_FILE
+            if self.send_track(test_track, True):
+                msg = f'Playlist found. Track spins will be logged to your show between {start_str} and {end_str}, {self.id}'
+                tk.messagebox.showwarning(title="Info", message=msg)
+            else:
+                tk.messagebox.showwarning(title="Error", message=f"Zookeeper playlist '{target_title}'  found but it is not writable. Check your Zookeeper API Key", parent=self.parent)
+                self.id = None
+
+        return self.id != None
 
 
 class UserConfiguration():

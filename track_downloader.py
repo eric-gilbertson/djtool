@@ -205,7 +205,7 @@ class TrackDownloader():
             return False
 
         is_url = 'https:/' in track_specifier
-        ARTIST_TRACK_SEPARATOR = r' - |;|\t' # split on -, ; and <tab>
+        ARTIST_TRACK_SEPARATOR = r' - |;|\t| – ' # split on -, ; and <tab>
         artistTerm = '%(artist)s' if use_fullname  else 'UNKNOWN'
         self.tracks.clear()
         self.track.reset()
