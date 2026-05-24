@@ -5,8 +5,6 @@ import math
 DJT_DOWNLOAD_BASE = expanduser("~") + "/Music/djtool"
 DJT_DOWNLOAD_DIR = DJT_DOWNLOAD_BASE + "/active"
 
-ZOOKEEPER_TIMEOUT_SECONDS = 5
-        
 def HMS_from_seconds(seconds):
     minutes, secs = divmod(seconds, 60)
     hours, minutes = divmod(minutes, 60)

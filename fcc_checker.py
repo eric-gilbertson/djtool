@@ -1,4 +1,4 @@
-import re, urllib, ssl, json
+import re, urllib, ssl, json, re
 from collections import Counter
 from system_config import SystemConfig
 import sys
@@ -13,12 +13,13 @@ from tkinter import messagebox
 # pink floyd ; money (bull shit)
 # james mcmurtry ; can't make it here (shit)
 # Orville Peck & Margo Price - You're an Asshole (asshole,)
-# julia king - insomnia (check correct author)
-# Don Williams - Leaving Louisiana in Broad Daylight (rodnney crowell)
+# julia king - insomnia (clean, check correct author)
+# Don Williams - Leaving Louisiana in Broad Daylight (clean, rodney crowell)
 # Zach Bryan - Bad News (motherfucker)
-# steven stills - season of the witch (donovan)
+# steven stills - season of the witch (clean, donovan)
 # Radiohead - creep (fuckin')
-# Congress of Wonders - Star Trip (Genius)
+# Congress of Wonders - Star Trip (clean, Genius)
+# India Ramey - Scattered And Smothered (fucked)
 
 class FCCChecker():
     SSL_CONTEXT = ssl._create_unverified_context()
@@ -39,7 +40,16 @@ class FCCChecker():
         self.song_url = None
         self.fcc_status = self.FCC_NOT_FOUND
         self.explicit_msg = ''
-        self.explicit_check()
+        self.explicit_count = 0
+
+        if self.artist and self.artist != '-' and self.title and self.title != '-':
+            (url, lyrics, album) = self.get_lyrics()
+            self.album = album
+            # strip protocol for readability
+            url = url[8:] if url and url.startswith('https://') else url
+            self.song_url = url
+            logit(f"Lyric search for {self.title} by {self.artist} found: {url}")
+            self.explicit_check(lyrics)
 
     # requires spotify premium account
     def get_album_label(self, artist_name, album_name):
@@ -223,48 +233,48 @@ class FCCChecker():
         return (url, lyrics, album)
     
     
-    def explicit_check(self):
-        BAD_WORDS = [ "asshole", "bullshit", "cocksucker", "cunt", "fuck", "fucker", \
-                      "fuckers", "fucking", "motherfucker", "motherfuckers", "nigger", "piss", \
-                      "shit", "tits" ]
+    def explicit_check(self, lyrics):
+        BAD_WORD_PATTERNS = [r"\basshole\b", r"\b[a-z]*shit[a-z]*\b", r"\b[a-z]*fuck[a-z]*\b", \
+                             r"\bcock[a-z]*\b", r"\bcunt\b", r"\bnigger\b", r"\bpiss\b", \
+                             r"\btits\b"]
 
-        self.fcc_status = self.FCC_NOT_FOUND
-        if not self.artist or self.artist == '-' or not self.title or self.title == '-':
+        if not lyrics:
             return
 
-        (url, lyrics, album) = self.get_lyrics()
-        self.album = album
-        # strip protocol for readability
-        url = url[8:] if url and url.startswith('https://') else url
-        self.song_url = url
-        logit(f"Lyric search for {self.title} by {self.artist} found: {url}")
+        lyrics_lc = lyrics.lower()
+        self.explicit_msg = ''
+        seperator = ''
 
-        if lyrics:
-            lyrics_lc = lyrics.lower()
-            words = re.findall(r'\w+', lyrics_lc)
-            word_counts = Counter(words)
+        for pattern in BAD_WORD_PATTERNS:
+            matches = re.findall(pattern, lyrics_lc)
+            match_count = len(matches)
+            self.explicit_count += match_count
+            if match_count > 0:
+                self.explicit_msg = f'{self.explicit_msg}{seperator}{matches[0]} {match_count}x'
+                seperator = ', '
 
-            self.explicit_msg = ''
-            seperator = ''
-            for word in BAD_WORDS:
-                if (count := word_counts.get(word, 0)) > 0:
-                    self.explicit_msg = f'{self.explicit_msg}{seperator}{word} {count}x'
-                    seperator = ', '
-
-            if self.explicit_msg:
-                self.fcc_status = self.FCC_DIRTY
-            else:
-               self.fcc_status = self.FCC_CLEAN
+        if self.explicit_msg:
+            self.fcc_status = self.FCC_DIRTY
+        else:
+            self.fcc_status = self.FCC_CLEAN
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 2:
         print("Usage: {} <ARTIST> <TRACK>".format(sys.argv[0]))
         sys.exit(1)
     else:
         SystemConfig.load_config('')
         artist_name = sys.argv[1]
         song_title = sys.argv[2]
-        check = FCCChecker(artist_name, song_title)
-        print(f'{song_title}:\nAlbum: {check.album}\nURL: {check.song_url}\nMessage: {check.explicit_msg}')
+        if artist_name == "explicit_check":
+            TEST_COUNT = 11
+            TEST_STRING = '''ass Asshole\n Cock, cockSucker, fuck; fuckin' motherfucker, fucked shit shithead bullshit - nigger'''
+            checker = FCCChecker('-', '-')
+            checker.explicit_check(TEST_STRING)
+            status = "pass" if checker.explicit_count == TEST_COUNT else "fail"
+            print(f"Test check status: {status}, found: {checker.explicit_count}, expected: {TEST_COUNT}\nMessage: {checker.explicit_msg}")
+        else:
+            check = FCCChecker(artist_name, song_title)
+            print(f'{song_title}:\nAlbum: {check.album}\nURL: {check.song_url}\nMessage: {check.explicit_msg}')
 

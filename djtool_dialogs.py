@@ -265,10 +265,10 @@ class TrackEditDialog(simpledialog.Dialog):
         self.fcc_status_combo.set(self.track_fcc_status)
 
         # Place widgets
-        self.artist_entry.grid(row=0, column=1, padx=5, pady=5)
-        self.title_entry.grid(row=1, column=1, padx=5, pady=5)
-        self.album_entry.grid(row=2, column=1, padx=5, pady=5)
-        self.label_entry.grid(row=3, column=1, padx=5, pady=5)
+        self.artist_entry.grid(row=0, column=1, sticky="w", padx=5, pady=5)
+        self.title_entry.grid(row=1, column=1, sticky="w", padx=5, pady=5)
+        self.album_entry.grid(row=2, column=1, sticky="w", padx=5, pady=5)
+        self.label_entry.grid(row=3, column=1, sticky="w", padx=5, pady=5)
         self.fcc_status_combo.grid(row=4, column=1, sticky='w', padx=5, pady=5)
 
         return self.artist_entry  # focus on artist field by default
