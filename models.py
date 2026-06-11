@@ -1,8 +1,7 @@
-import datetime, os, ssl
+import datetime, os, ssl, re
 from tinytag import TinyTag
 import json
 import pathlib
-import re
 import urllib
 import tkinter as tk
 import yaml
@@ -40,11 +39,29 @@ class Track():
         dict = self.__dict__
         return dict
 
+    def have_artist(self):
+        return self.artist and self.artist != '-'
+
+    def have_artist_match(self, artist):
+        artist_clean = re.sub(r'[^a-zA-Z0-9]', '', artist).lower()
+        primary_artist_clean = re.sub(r'[^a-zA-Z0-9]', '', self.get_primary_artist()).lower()
+        return artist_clean in primary_artist_clean or primary_artist_clean in artist_clean
+
+    def have_title(self):
+        return self.title and self.title != '-'
+
+    def have_title_match(self, title):
+        title_clean = re.sub(r'[^a-zA-Z0-9]', '', title).lower()
+        primary_title_clean = re.sub(r'[^a-zA-Z0-9]', '', self.get_primary_title()).lower()
+        return title_clean in primary_title_clean or primary_title_clean in title_clean
+
     # treat ablum == title as false because YT incorrectly uses the
     # song title as the album name. if the FCC check finds another name
     # then we adopt it as the correct value.
     def have_valid_album(self):
-        result = self.album and self.album != '-' and self.album != self.title
+        # may not be valid if the album matches the song title. note that in this case
+        # Shazam will append the album name with ' - Single' so check using startswith().
+        result = self.album and self.album != '-' and not self.album.startswith(self.title)
         return result
 
     def reset(self):
@@ -99,7 +116,7 @@ class Track():
         return is_spot
                 
     def is_readback_file(self):
-        is_audio = re.search('readback[0-9]+\\.', self.file_path)
+        is_audio = re.search('READBACK_[0-9]+\\.', self.file_path)
         return is_audio
 
     def is_stop_file(self):

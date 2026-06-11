@@ -437,7 +437,12 @@ class SelectTrackDialog(simpledialog.Dialog):
         tracks = ''
         for track in self.track_choices:
             if track: # somehow got here if a None track so add this protection
-                tracks = tracks + f"{idx}: {track['duration']} {track['title']} - {track['artists'][0]['name']} - {track['album']['name']}\n"
+                album_name = track['album'].get('name', '' ) if track['album'] else ''
+                artist_name = track['artists'][0]['name']
+                # some names are appended with ' - Topic', e.g. Dida Pelled - Hesitation Blues
+                artist_name = artist_name[:-8] if artist_name.endswith(' - Topic') else artist_name
+                new_track = f"{idx}: {track['duration']} {track['title']} - {artist_name} - {album_name}\n"
+                tracks += new_track
                 idx = idx + 1
 
         self.choices_entry.insert("1.0", tracks)

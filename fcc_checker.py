@@ -20,6 +20,7 @@ from tkinter import messagebox
 # Radiohead - creep (fuckin')
 # Congress of Wonders - Star Trip (clean, Genius)
 # India Ramey - Scattered And Smothered (fucked)
+# Bill Kirchen Honky - Tonk Hellfire (should find album even with no spaces around hyphen)
 
 class FCCChecker():
     SSL_CONTEXT = ssl._create_unverified_context()
@@ -30,11 +31,9 @@ class FCCChecker():
     FCC_UNKNOWN = '-'
     FCC_STATUS_AR = [FCC_CLEAN, FCC_DIRTY, FCC_NOT_FOUND, FCC_UNKNOWN]
 
-    #NOTE: artist should be primary artist & title should be title only, e.g. not ft....
-    def __init__(self, artist, title):
+    def __init__(self, track):
         super().__init__()
-        self.artist = artist
-        self.title = title
+        self.track = track
         self.label = None
         self.album = None
         self.song_url = None
@@ -42,13 +41,13 @@ class FCCChecker():
         self.explicit_msg = ''
         self.explicit_count = 0
 
-        if self.artist and self.artist != '-' and self.title and self.title != '-':
+        if self.track.have_artist() and self.track.have_title():
             (url, lyrics, album) = self.get_lyrics()
             self.album = album
             # strip protocol for readability
             url = url[8:] if url and url.startswith('https://') else url
             self.song_url = url
-            logit(f"Lyric search for {self.title} by {self.artist} found: {url}")
+            logit(f"Lyric search for {self.track.title} by {self.track.artist} found: {url}")
             self.explicit_check(lyrics)
 
     # requires spotify premium account
@@ -113,7 +112,7 @@ class FCCChecker():
     
         
     def confirm_song_match(self, found_artist, found_title):
-        msg = f"FCC check found lyrics for {found_title} by {found_artist} instead of {self.title} by {self.artist}. Is this the same song?"
+        msg = f"FCC check found lyrics for {found_title} by {found_artist} instead of {self.track.title} by {self.track.artist}. Is this the same song?"
         return messagebox.askyesno("Confirm Lyrics", msg)
 
     def get_lyrics_genius(self):
@@ -124,14 +123,14 @@ class FCCChecker():
     
         try:
             genius = lyricsgenius.Genius(SystemConfig.genius_apikey, skip_non_songs=True, remove_section_headers=True)
-            artist_lc = self.artist.lower()
-            song = genius.search_song(artist=self.artist, title=self.title)
+            artist_lc = self.track.artist.lower()
+            song = genius.search_song(artist=self.track.get_primary_artist(), title=self.track.get_primary_title())
             song_artist_lc = song.artist.lower() if song else ''
             artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
             if song and not artist_match:
                 if not self.confirm_song_match(song.artist, song.title):
                     # rejected first choice so tray again with just the title
-                    song = genius.search_song(title=self.title)
+                    song = genius.search_song(title=self.track.title)
                     song_artist_lc = song.artist.lower() if song else ''
                     artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
                     if song and not artist_match and not self.confirm_song_match(song.artist, song.title):
@@ -144,7 +143,7 @@ class FCCChecker():
                 url = song.url
     
         except Exception as ex:
-            logit(f"Error fetching Genius lyrics {self.title}, {ex}")
+            logit(f"Error fetching Genius lyrics {self.track.title}, {ex}")
     
         return (url, lyrics, album)
 
@@ -165,40 +164,55 @@ class FCCChecker():
     # the song ID and the hypenated title from the result.
     def shazam_lookup(self):
         id = title = None
-        artist_lc = self.artist.lower()
-        title_lc = self.title.lower()
-        search_term=f"{self.artist} {self.title}"
+        search_term=f"{self.track.get_primary_artist()} {self.track.get_primary_title()}"
         term_safe = urllib.parse.quote(search_term)
-    
-        url = f"https://www.shazam.com/services/amapi/v1/catalog/US/search?types=songs&limit=1&term={term_safe}"
+
+        # ask for 5 items because the best match is usually but not always the 1st response
+        # item so we have to search the entire result set for the best match.
+        url = f"https://www.shazam.com/services/amapi/v1/catalog/US/search?types=songs&limit=5&term={term_safe}"
         req = urllib.request.Request(url, method=f'GET')
         with urllib.request.urlopen(req, timeout=10, context=self.SSL_CONTEXT) as response:
             res_obj  = json.loads(response.read())
             result = res_obj['results']
             songs = result['songs']
             data = songs['data']
-            song = data[0]
-            id = song['id']
-            attrs = song['attributes']
-            song_artist = attrs['artistName']
-            song_artist_lc = song_artist.lower()
-            artist_match = artist_lc in song_artist_lc or song_artist_lc in artist_lc
-            song_title = attrs['name'].strip()
-            song_title_lc = song_title.lower()
-            title_match =  title_lc in song_title_lc or song_title_lc in title_lc
-            have_match = artist_match and title_match
-            if have_match or self.confirm_song_match(song_artist, song_title):
-                album = attrs['albumName']
-                previews = attrs['previews']
+            full_match_song = None
+            title_match_songs = []
+            album_name = None
+            for song in enumerate(data):
+                song = song[1]
+                attrs = song['attributes']
+                song_artist = attrs['artistName']
+                artist_match = self.track.have_artist_match(song_artist)
+                song_title = attrs['name'].strip()
+                title_match =  self.track.have_title_match(song_title)
+                if artist_match and title_match:
+                    full_match_song = song
+                    album_name = attrs['albumName']
+                    if not album_name.endswith(' - Single'):
+                        break
+                elif title_match:
+                    title_match_songs.append(song)
+
+            target_song = full_match_song
+            if not target_song:
+                for candidate in title_match_songs:
+                    attrs = song['attributes']
+                    if self.confirm_song_match(attrs['artistName'], attrs['name']):
+                        target_song = candidate
+                        break
+
+            if target_song:
+                attrs = song['attributes']
                 url = attrs['url']
                 ALBUM_KEY = '/album/'
                 idx1 = url.find(ALBUM_KEY)
                 ALBUM_KEY_LEN = len(ALBUM_KEY)
                 idx2 = url.find('/', idx1 + ALBUM_KEY_LEN + 1)
                 title = url[idx1+ALBUM_KEY_LEN : idx2]
-                album = album if have_match else ''
+                return (target_song['id'], title, album_name)
 
-            return (id, title, album)
+        return(None, None, None)
     
     # get song lyrics by fetching the shazam page and scraping the lyrics by looking for the 
     # '"text": "' anchor and pulling everything between the start & end quotes. sanity check the
@@ -235,7 +249,7 @@ class FCCChecker():
     
     def explicit_check(self, lyrics):
         BAD_WORD_PATTERNS = [r"\basshole\b", r"\b[a-z]*shit[a-z]*\b", r"\b[a-z]*fuck[a-z]*\b", \
-                             r"\bcock[a-z]*\b", r"\bcunt\b", r"\bnigger\b", r"\bpiss\b", \
+                             r"\bcocksucker\b", r"\bcunt\b", r"\bnigger\b", r"\bpiss\b", \
                              r"\btits\b"]
 
         if not lyrics:
@@ -270,11 +284,16 @@ if __name__ == "__main__":
         if artist_name == "explicit_check":
             TEST_COUNT = 11
             TEST_STRING = '''ass Asshole\n Cock, cockSucker, fuck; fuckin' motherfucker, fucked shit shithead bullshit - nigger'''
-            checker = FCCChecker('-', '-')
+            track = Track()
+            track.title = track.artist = '-'
+            checker = FCCChecker(track)
             checker.explicit_check(TEST_STRING)
             status = "pass" if checker.explicit_count == TEST_COUNT else "fail"
             print(f"Test check status: {status}, found: {checker.explicit_count}, expected: {TEST_COUNT}\nMessage: {checker.explicit_msg}")
         else:
-            check = FCCChecker(artist_name, song_title)
+            track = Track()
+            track.title = song_title
+            track.artist = artist_name
+            check = FCCChecker(track)
             print(f'{song_title}:\nAlbum: {check.album}\nURL: {check.song_url}\nMessage: {check.explicit_msg}')
 
