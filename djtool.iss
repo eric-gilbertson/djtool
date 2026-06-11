@@ -52,6 +52,7 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Source: "C:\Users\engineering\src\djtool\dist\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Users\engineering\src\djtool\ffmpeg.exe"; DestDir: "{app}"; Flags: ignoreversion
 Source: "C:\Users\engineering\src\djtool\djtool.ico"; DestDir: "{app}"; Flags: ignoreversion
+Source: "C:\Users\engineering\src\djtool\djtool.html"; DestDir: "{app}"; Flags: ignoreversion
 
 [Registry]
 Root: HKA; Subkey: "Software\Classes\{#MyAppAssocExt}\OpenWithProgids"; ValueType: string; ValueName: "{#MyAppAssocKey}"; ValueData: ""; Flags: uninsdeletevalue
