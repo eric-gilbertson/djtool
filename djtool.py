@@ -116,8 +116,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.bind('<FocusIn>', lambda e: self._on_focus_in())
         self.bind('<FocusOut>', lambda e: self._on_focus_out())
 
-        self._dragging_item = None          # internal reorder
-        self._dragging_start_id = None          # internal reorder
+        self._dragging_items = None          # internal reorder
         self._dragging_active = False
         self._insert_line = None            # blue insertion line widget
 
@@ -547,9 +546,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         selection = self.tree.selection()
         items = self.tree.get_children("")
 
+        is_down = direction == "down"
         if not selection:
             # if nothing selected, start at first/last
-            idx = 0 if direction == "down" else len(items) - 1
+            idx = 0 if is_down else len(items) - 1
         else:
             # last focused item index
             focus = self.tree.focus() or selection[-1]
@@ -558,14 +558,15 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             except ValueError:
                 idx = 0
 
-            idx = max(0, min(len(items) - 1, idx + (1 if direction == "down" else -1)))
+            idx = max(0, min(len(items) - 1, idx + (1 if is_down else -1)))
 
-        new_item = items[idx]
+        new_item_id = items[idx]
 
-        # Add new item to selection
-        self.tree.selection_add(new_item)
-        self.tree.focus(new_item)
-        self.tree.see(new_item)
+        self.tree.selection_add(new_item_id)
+        self.tree.focus(new_item_id)
+        self.tree.see(new_item_id)
+
+
         return "break"  # prevent default move
 
 
@@ -643,22 +644,28 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     # ======================= INTERNAL REORDER DnD =======================
     def _tv_on_btn1_press(self, event):
-        self._dragging_item = None
+        self._dragging_items = None
         row_id = self.tree.identify_row(event.y)
-        if (event.state & 0x0001) != 0:
+        tree_selection = self.tree.selection()
+
+        if not row_id:
+            self.tree.selection_remove(*tree_selection) #unselect all if clicked outside
+        elif (event.state & 0x0001) != 0:
             track = self.tree_datamap[row_id]
             self.edit_track(track)
             return "break"
-        elif row_id:
-            self._dragging_item = row_id
-            self._dragging_active = False
-            self.tree.focus(row_id)
-
+        else:
             rows = list(self.tree.get_children(""))
-            self._dragging_start_idx = rows.index(row_id) if row_id else len(rows)
+            self._dragging_active = False
+            if len(tree_selection) > 1:
+                self._dragging_items = tree_selection
+                return 'break' # so that rows are not delselected
+            else:
+                self._dragging_items = (row_id,)
+
 
     def _on_drag_motion_internal(self, event):
-        if not self._dragging_item:
+        if not self._dragging_items:
             return
 
         self._dragging_active = True
@@ -670,42 +677,75 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             self._show_insert_line_at_end()
 
     def _on_drop_internal(self, event):
-        if not self._dragging_item or not self._dragging_active:
+        if not self._dragging_items or not self._dragging_active:
             self._hide_insert_line()
             return
 
-
-        # Compute target by current mouse Y
-        self._set_dirty(True)
-        dragging = self._dragging_item
-        self._dragging_item = None
-
-        row = self.tree.identify_row(event.y)
         rows = list(self.tree.get_children(""))
-        drop_index = rows.index(row)  if row else len(rows)
-        drag_down = drop_index > self._dragging_start_idx
+        dragging = set(self._dragging_items)
+        remaining = [r for r in rows if r not in dragging]
+        target_row = self.tree.identify_row(event.y)
 
-        if drag_down:
-            start = self._dragging_start_idx + 1
-            end = drop_index - 1
-            for i in range(start, end):
-                row = rows[i]
-                self.tree.move(row, "", i - 1)
+        if target_row in remaining:
+            insert_pos = remaining.index(target_row)
+        else:
+            insert_pos = len(remaining)
 
-            drop_index = drop_index - 1
-        else: # drag up
-            start = drop_index
-            end = self._dragging_start_idx
-            for i in range(start, end):
-                row = rows[i]
-                self.tree.move(row, "", i + 1)
+        new_rows = (
+            remaining[:insert_pos]
+            + list(self._dragging_items)
+            + remaining[insert_pos:]
+        )
 
-        self.tree.move(dragging, "", drop_index)
-        self._hide_insert_line()
+        for index, item in enumerate(new_rows):
+            self.tree.move(item, "", index)        
+
         self._renumber_rows()
+        self._set_dirty(True)
+        self._hide_insert_line()
 
         # leave for a bit so user has visual feedback then clear.
-        self.after(500, lambda: self.tree.selection_set(()))
+        self.after(1000, lambda: self.tree.selection_set(()))
+
+
+
+#    def _on_drop_internal_XXXX(self, event):
+#        if not self._dragging_items or not self._dragging_active:
+#            self._hide_insert_line()
+#            return
+#
+#
+#        # Compute target by current mouse Y
+#        self._set_dirty(True)
+#        dragging = self._dragging_items
+#        self._dragging_items = None
+#
+#        row = self.tree.identify_row(event.y)
+#        rows = list(self.tree.get_children(""))
+#        drop_index = rows.index(row)  if row else len(rows)
+#        drag_down = drop_index > self._dragging_start_idx
+#
+#        if drag_down:
+#            start = self._dragging_start_idx + 1
+#            end = drop_index - 1
+#            for i in range(start, end):
+#                row = rows[i]
+#                self.tree.move(row, "", i - 1)
+#
+#            drop_index = drop_index - 1
+#        else: # drag up
+#            start = drop_index
+#            end = self._dragging_start_idx
+#            for i in range(start, end):
+#                row = rows[i]
+#                self.tree.move(row, "", i + 1)
+#
+#        self.tree.move(dragging, "", drop_index)
+#        self._hide_insert_line()
+#        self._renumber_rows()
+#
+#        # leave for a bit so user has visual feedback then clear.
+#        self.after(500, lambda: self.tree.selection_set(()))
 
     # ======================= EXTERNAL DROP (Finder) =======================
     def _on_drag_motion_external(self, event):
@@ -1209,7 +1249,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         time_delta = cur_time - self.last_doubleclick_time
         self.last_doubleclick_time = cur_time
         # protect against false double click
-        if time_delta < 10:
+        if time_delta < 5:
             logit(f"ignore double_click: {time_delta}")
         else:
             self.play_selected()
