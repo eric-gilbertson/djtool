@@ -1,5 +1,7 @@
 import re, urllib, ssl, json, re
 from collections import Counter
+
+from models import Track
 from system_config import SystemConfig
 import sys
 import spotipy
@@ -21,6 +23,7 @@ from tkinter import messagebox
 # Congress of Wonders - Star Trip (clean, Genius)
 # India Ramey - Scattered And Smothered (fucked)
 # Bill Kirchen Honky - Tonk Hellfire (should find album even with no spaces around hyphen)
+# Tom Rush - Jamaica say you will (should find Shazam lyrics. instead uses genius version)
 
 class FCCChecker():
     SSL_CONTEXT = ssl._create_unverified_context()
@@ -124,7 +127,8 @@ class FCCChecker():
         try:
             genius = lyricsgenius.Genius(SystemConfig.genius_apikey, skip_non_songs=True, remove_section_headers=True)
             artist_lc = self.track.artist.lower()
-            song = genius.search_song(artist=self.track.get_primary_artist(), title=self.track.get_primary_title())
+            # search by title only so that we get lyrics for cover versions
+            song = genius.search_song(title=self.track.get_primary_title())
             song_artist_lc = song.artist.lower() if song else ''
             artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
             if song and not artist_match:
@@ -203,25 +207,25 @@ class FCCChecker():
                         break
 
             if target_song:
-                attrs = song['attributes']
+                attrs = target_song['attributes']
                 url = attrs['url']
                 ALBUM_KEY = '/album/'
                 idx1 = url.find(ALBUM_KEY)
                 ALBUM_KEY_LEN = len(ALBUM_KEY)
                 idx2 = url.find('/', idx1 + ALBUM_KEY_LEN + 1)
                 title = url[idx1+ALBUM_KEY_LEN : idx2]
-                return (target_song['id'], title, album_name)
+                return (target_song['id'], title, album_name, attrs['hasLyrics'])
 
-        return(None, None, None)
+        return(None, None, None, None)
     
     # get song lyrics by fetching the shazam page and scraping the lyrics by looking for the 
     # '"text": "' anchor and pulling everything between the start & end quotes. sanity check the
-    # indicies so we are insulated against returing false data in the case of a page format change.
+    # indices so we are insulated against returning false data in the case of a page format change.
     def get_lyrics_shazam(self):
         album = lyrics = url = ''
         try:
-            (id, title, album) = self.shazam_lookup()
-            if id and title:
+            (id, title, album, has_lyrics) = self.shazam_lookup()
+            if id and title and has_lyrics:
                 url = f"https://www.shazam.com/song/{id}/{title}"
                 req = urllib.request.Request(url, method=f'GET')
                 with urllib.request.urlopen(req, timeout=15, context=self.SSL_CONTEXT) as response:
@@ -241,7 +245,7 @@ class FCCChecker():
                     else:
                         logit(f"lyrics not found: {lyrics_start_idx}, {lyrics_end_idx}, {lyrics_offset}, {character_cnt}")
         except Exception as ex:
-            logit(f"Exectpion while fetching Shazam lyrics: {url}, {ex}")
+            logit(f"Exception while fetching Shazam lyrics: {url}, {ex}")
             url = None
         
         return (url, lyrics, album)

@@ -179,14 +179,12 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             x, y = top.winfo_pointerxy()
             if cursor and (widget := top.winfo_containing(x, y)):
                 try:
-                    logit(f"set widget: {cursor}")
                     widget.config(cursor=cursor)
                     self.last_cursor_widget = widget
                 except tk.TclError as ex:
                     logit(f"set widget exception: {cursor}")
                     pass
             elif not cursor and self.last_cursor_widget:
-                logit(f"set last widget: {cursor}")
                 self.last_cursor_widget.config(cursor=cursor) # handle case where user moused out of app
                 self.last_cursor_widget = None
             else:
@@ -582,21 +580,28 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             start_time_secs = start_time_secs + track.duration
 
     def _delete_selected(self):
-        msg = "Do you want to also delete the audio files associated with the selected entries?"
-        response = messagebox.askyesnocancel("Confirm Request", msg, parent=self)
+        msg = "Do you want to remove the selected songs from the playlist"
+        doit = messagebox.askyesnocancel("Confirm Operation", msg, parent=self)
         self.tree.focus_set()      # Explicitly set focus back to the main window
-
-        if response is None:
+ 
+        if doit is None:
             return
-        else:
-            for item_id in self.tree.selection():
-                self.tree.delete(item_id)
-                track = self.tree_datamap.pop(item_id, None)
-                if response and os.path.exists(track.file_path) and track.is_downloaded_file():
-                    os.remove(track.file_path)
+
+        msg = '''Which of the associated music files should be deleted?'''
+        dialog = CTkMessagebox(title="File Deletion", message=msg, icon="question", option_1="Delete All Files", option_2="Delete Downloaded Files", option_3="No File Deletion")
+        answer = dialog.get()
+            
+        delete_all = answer == "Delete All Files"
+        delete_downloaded = answer == "Delete Downloaded Files"
+        for item_id in self.tree.selection():
+            self.tree.delete(item_id)
+            track = self.tree_datamap.pop(item_id, None)
+            file_exists = os.path.exists(track.file_path)
+            if file_exists and (delete_all or delete_downloaded and track.is_downloaded_file()):
+                os.remove(track.file_path)
   
-            self._renumber_rows()
-            self._set_dirty(True)
+        self._renumber_rows()
+        self._set_dirty(True)
 
     def _move_selection(self, direction: int):
         items = self.tree.get_children("")
@@ -1187,11 +1192,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     def live_show_change(self):
         if self.live_show.get():
-            if SystemConfig.check_have_user_key():
-                show_title = UserConfiguration.show_title
-                LiveShowDialog(self, show_title, "12 am")
-            else:
-                self.clear_live_show()
+            show_title = UserConfiguration.show_title
+            apikey = UserConfiguration.playlist_apikey
+            LiveShowDialog(self, show_title, "12 am", apikey)
         else:
             self.clear_live_show()
 
@@ -1199,8 +1202,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.live_show.set(False)
         self.playlist.id = None
 
-    def check_show_playlist(self, show_title):
-        if not self.playlist.check_show_playlist(show_title):
+    def check_show_playlist(self, show_title, apikey, proxy_apikey):
+        if not self.playlist.check_show_playlist(show_title, apikey, proxy_apikey):
             self.live_show.set(False)
 
     def copy_selected_rows(self):
@@ -1357,6 +1360,5 @@ if __name__ == "__main__":
         logit("load playlist: " + sys.argv[1])
         app.load_playlist(sys.argv[1])
 
-    app.after(500, app.downloader.check_dependencies())
     app.mainloop()
 
