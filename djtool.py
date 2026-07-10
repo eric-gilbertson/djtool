@@ -27,7 +27,8 @@ VLC like media player optimized for use in live radio features include:
 #gettext.translation = safe_translation
 
 import glob,  json,  os,  pathlib,  platform,  shlex, webbrowser, ctypes
-import shutil,  sys,  threading,  time
+import shutil,  sys, time
+import subprocess
 import tkinter as tk,  traceback
 import sounddevice as sd
 from tkinter import PhotoImage
@@ -35,7 +36,6 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 
 from concurrent.futures import ThreadPoolExecutor
 from CTkMessagebox import CTkMessagebox
-from pydub import AudioSegment
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from commondefs import *
 from djtool_dialogs import SelectAlbumDialog, LiveShowDialog, UserConfigurationDialog, TrackEditDialog
@@ -854,19 +854,19 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     # ======================= PLAYLIST SAVE/LOAD =======================
     def save_mp3(self):
         try:
-            if not shutil.which("ffprobe"):
-                tk.messagebox.showwarning(title="Error", message='ffprobe is required for this operation.', parent=self)
+            if not self.FFMPEG_PATH:
+                tk.messagebox.showwarning(title="Error", message='ffmpeg is required for this operation.', parent=self)
                 return
     
             if not self.tree.get_children(""):
-                logit("[Save] No files to save.")
+                logit("No files to save.")
                 return
     
             msg = '''Would you like to export all songs or only those with an unknown FCC status?'''
             dialog = CTkMessagebox(title="MP3 Save", message=msg, icon="question", option_1="All Songs", option_2="Unknown FCC Songs Only")
             answer = dialog.get()
             all_tracks = answer == 'All Songs'
-            
+
             seconds = 0
             track_cnt = 0
             for item in self.tree.get_children(""):
@@ -890,44 +890,46 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             )
             if not filename:
                 return
-    
+
             self.set_cursor('clock')
-            logit('start wav file concatenation')
-            full_show = AudioSegment.empty()
             duration = 0
+            ffmpeg_cmd = [self.FFMPEG_PATH]
+            file_cnt = 0
             for item in self.tree.get_children(""):
                 track = self.tree_datamap[item]
-                logit(f"Concat: {track.title}")
                 if not all_tracks and track.fcc_status != 'NOT_FOUND':
                     continue
-    
-                duration = duration + track.duration
-    
-                audio = None
-                if track.file_path.endswith('.mp3') and os.path.exists(track.file_path):
-                    audio = AudioSegment.from_mp3(track.file_path)
-                elif track.file_path.endswith('.wav') and os.path.exists(track.file_path):
-                    audio = AudioSegment.from_wav(track.file_path)
-                elif track.file_path.endswith('.opus') and os.path.exists(track.file_path):
-                    audio = AudioSegment.from_file(track.file_path, format="ogg")
+
+                if track.file_path.lower().endswith((".mp3", ".wav", ".opus")):
+                    # don't need to escape file paths because not going through the shell.
+                    ffmpeg_cmd.extend(["-i", track.file_path ])
+                    duration = duration + track.duration
+                    file_cnt += 1
                 else:
                     skip_msg = f"Skipping missing or unsupported file: {track.file_path}"
                     logit(skip_msg)
-    
-                if audio:
-                    full_show = full_show + audio
-    
+
+            ffmpeg_inputs = "".join(f"[{i}:a]" for i in range(file_cnt))
+            ffmpeg_cmd.extend([ "-y",
+                "-filter_complex",
+                f"{ffmpeg_inputs}concat=n={file_cnt}:v=0:a=1[out]",
+                "-map", "[out]",
+                "-c:a", "libmp3lame",
+                filename
+            ])
             logit(f"start mp3 export {filename}")
-            full_show.export(filename, format="mp3")
-            logit(f"done mp3 export {filename}")
-            self.set_cursor('')
-            tk.messagebox.showwarning(title="MP3 File Saved", message=f'Playlist saved as {filename}', parent= self)
+            cmd_result = subprocess.run(ffmpeg_cmd,  capture_output=True, text=True, check=True)
+            logit(f"done mp3 export {filename}, {cmd_result.returncode}")
+            if cmd_result.returncode == 0:
+                tk.messagebox.showwarning(title="MP3 File Saved", message=f'Playlist saved as {filename}', parent= self)
+            else:
+                tk.messagebox.showwarning(title="MP3 Export Error", message=f'{cmd_result.stderr}', parent= self)
         except Exception as ex:
-            msg = f"Error occurred while exporting mp3 file: {ex}"
+            msg = f"Error occurred while exporting mp3 file: {ex.returncode}, {ex.stderr}"
             logit(msg)
             tk.messagebox.showwarning(title="Error", message=msg, parent= self)
 
-
+        self.set_cursor('')
 
     def fcc_set_unknown_to_safe(self):
         msg = '''Would you like set all tracks with unknown FCC status (yellow) to safe (green)?'''

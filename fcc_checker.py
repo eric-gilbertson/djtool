@@ -105,8 +105,6 @@ class FCCChecker():
                 return None
         
             track = results["tracks"]["items"][0]
-            normalized_title = track["name"]
-            normalized_artist = track["artists"][0]["name"]
             is_explicit = track['explicit']
         except Exception as ex:
             logit(f"Exception getting album explicit from spotify {ex}")
@@ -119,33 +117,33 @@ class FCCChecker():
         return messagebox.askyesno("Confirm Lyrics", msg)
 
     def get_lyrics_genius(self):
-        url = lyrics = album =None
+        url = lyrics = album = None
         if not SystemConfig.genius_apikey:
-            logit("Skipping genius check, api key not set")
+            logit("Skipping Genius check, api key not set")
             return (None, None, None)
     
         try:
             genius = lyricsgenius.Genius(SystemConfig.genius_apikey, skip_non_songs=True, remove_section_headers=True)
-            artist_lc = self.track.artist.lower()
-            # search by title only so that we get lyrics for cover versions
-            song = genius.search_song(title=self.track.get_primary_title())
-            song_artist_lc = song.artist.lower() if song else ''
-            artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
+            song = genius.search_song(artist=self.track.get_primary_artist(),
+                                      title=self.track.get_primary_title())
+            artist_match = song and self.track.have_artist_match(song.artist)
             if song and not artist_match:
                 if not self.confirm_song_match(song.artist, song.title):
-                    # rejected first choice so tray again with just the title
-                    song = genius.search_song(title=self.track.title)
-                    song_artist_lc = song.artist.lower() if song else ''
-                    artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
-                    if song and not artist_match and not self.confirm_song_match(song.artist, song.title):
-                        song = None
-    
+                    song = None
+
+            if not song:
+                # nothing found so try again with just the title in case song is a cover
+                song = genius.search_song(title=self.track.title)
+                if song and not self.confirm_song_match(song.artist, song.title):
+                    song = None
+
             if song:
                 album = song.album.get('name', '') if song.album and artist_match else ''
-                logit(f"Found song {song.title} on {album}: {song.api_path}")
+                logit(f"Found Genius song {song.title} on {album}: {song.api_path}")
                 lyrics = song.lyrics
                 url = song.url
-    
+
+
         except Exception as ex:
             logit(f"Error fetching Genius lyrics {self.track.title}, {ex}")
     
@@ -201,7 +199,7 @@ class FCCChecker():
             target_song = full_match_song
             if not target_song:
                 for candidate in title_match_songs:
-                    attrs = song['attributes']
+                    attrs = candidate['attributes']
                     if self.confirm_song_match(attrs['artistName'], attrs['name']):
                         target_song = candidate
                         break
