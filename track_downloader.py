@@ -479,7 +479,7 @@ class SelectTrackDialog(simpledialog.Dialog):
             artists = ''
             seperator = ''
             for artist in track['artists']:
-                artists = f'{artists}{seperator}{artist['name']}'
+                artists = f'{artists}{seperator}{artist["name"]}'
                 seperator = ', '
             self.track.artist = artists
             self.on_close()

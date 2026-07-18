@@ -437,7 +437,7 @@ class UserConfiguration():
 
     @staticmethod
     def get_show_start_seconds():
-        seconds = 0
+        seconds = -1
 
         if UserConfiguration.show_start_time == 'None':
             return -1
