@@ -265,9 +265,13 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 self.set_cursor("")
                 self.bell()
             else:
-                tk.messagebox.showwarning(title='Error', message=self.downloader.err_msg, parent=self)
                 self.set_cursor("")
                 self.bell()
+                if tk.messagebox.askokcancel(title='Error', message='Your download was aborted. Do you want to retry it?', parent=self):
+                    self.downloader.is_done = False
+                    self._fetch_track(True)
+                else:
+                    return
 
 
     def _edit_configuration(self):

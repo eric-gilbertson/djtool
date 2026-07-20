@@ -69,6 +69,7 @@ class YTDLPThread(threading.Thread):
             #NOTE: string extraction can throw an execption on Windows because the string can
             # contain binary data that it can't decode.
             stdout = output_buffer.getvalue()
+            raise TypeError("Age must be an integer.") ############
             self.done_callback(status, self.file_prefix, stdout)
         except Exception as ex:
             ret_msg = f"An exception occurred during download -{ex}-"
@@ -222,7 +223,7 @@ class TrackDownloader():
         elif use_fullname:
             self.track_url = track_specifier
 
-        is_watch = "youtube.com/watch?" in self.track_url
+        is_watch = "youtube.com/watch?" in self.track_url or 'youtube.com/shorts/' in self.track_url
         is_playlist = "youtube.com/playlist?" in self.track_url
         if not (is_watch or is_playlist):
             tk.messagebox.showwarning(title="Error", message=error_msg, parent=self.parent)
@@ -270,6 +271,7 @@ class TrackDownloader():
             self.name_too_long = True
         elif returnCode != 0:
             self.err_msg = f"yt-dlp download error: {stdOut}"
+            logit(self.err_msg);
         else:
             new_files = glob.glob(f"{dwnld_prefix}*")
             for new_file in new_files:
