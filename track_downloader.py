@@ -69,7 +69,6 @@ class YTDLPThread(threading.Thread):
             #NOTE: string extraction can throw an execption on Windows because the string can
             # contain binary data that it can't decode.
             stdout = output_buffer.getvalue()
-            raise TypeError("Age must be an integer.") ############
             self.done_callback(status, self.file_prefix, stdout)
         except Exception as ex:
             ret_msg = f"An exception occurred during download -{ex}-"

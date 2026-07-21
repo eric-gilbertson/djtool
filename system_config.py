@@ -1,4 +1,5 @@
 import json
+import pathlib
 import ssl
 import tkinter.messagebox
 import urllib
@@ -20,12 +21,13 @@ class SystemConfig():
 
     @staticmethod
     def load_config(user_apikey_arg):
+        SYS_CONFIG_FILE = f'{pathlib.Path.home()}/.djtool_system.yaml'
         config_dict = {} 
         try:
-            with open('system_config.yaml', 'r') as file:
+            with open(SYS_CONFIG_FILE, 'r') as file:
                 config_dict = yaml.safe_load(file)
         except Exception as ex:
-            logit(f'Error reading system_config.yaml configuration file: {ex}')
+            logit(f'Exception reading system configuration file {SYS_CONFIG_FILE}: {ex}')
 
         config_dict = config_dict if config_dict else {} 
         SystemConfig.playlist_host = config_dict.get('PLAYLIST_HOST', 'https://zookeeper.stanford.edu')
