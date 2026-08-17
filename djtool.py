@@ -245,6 +245,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 else:
                     return
             elif len(self.downloader.tracks) > 0:
+                missing_field = False
                 self._set_dirty(True)
                 for track in self.downloader.tracks:
                     # TODO: do these in background
@@ -254,11 +255,15 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     song_url = fcc_check.song_url
                     #track.fetch_label() - requires spotify premium
     
+                    missing_field = missing_field or not track.have_artist() or not track.have_title()
                     # replace with the genius album if we don't have a good album name already.
                     if fcc_check.album and not track.have_valid_album():
                         track.album = fcc_check.album
                 
                     self._insert_track(-1, status, comment, track.artist, track.title, track.album, track.label, track.file_path, True, song_url)
+
+                if missing_field:
+                    tk.messagebox.showwarning(title="Alert", message='Song title or artist is empty')
 
                 self.url.delete(0, "end")
                 self.url.update()
@@ -536,6 +541,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             track.album = dialog.track_album
             track.label = dialog.track_label
             track.fcc_status = dialog.track_fcc_status
+            track.fcc_comment = dialog.track_fcc_comment
+            track.song_url = dialog.track_song_url
             row_values = self.tree.item(track.id)["values"]
             row_values = (*row_values[0:2], track.artist, track.title, track.album_display(), track.fcc_status_glyph())
             self.tree.item(track.id, values=row_values)
@@ -686,7 +693,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             self._show_insert_line_at_end()
 
     def _on_drop_internal(self, event):
-        if not self._dragging_items or not self._dragging_active:
+        selections = self.tree.selection()
+        if not self._dragging_items or not self._dragging_active or len(selections) == 0:
             self._hide_insert_line()
             return
 
@@ -694,6 +702,12 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         dragging = set(self._dragging_items)
         remaining = [r for r in rows if r not in dragging]
         target_row = self.tree.identify_row(event.y)
+        source_idx = self.tree.index(selections[0])
+        drop_idx = self.tree.index(target_row)
+        valid_drop = drop_idx - source_idx >=2 or drop_idx < source_idx
+        if not valid_drop:
+            self._hide_insert_line()
+            return
 
         if target_row in remaining:
             insert_pos = remaining.index(target_row)

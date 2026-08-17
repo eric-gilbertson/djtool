@@ -2,9 +2,10 @@ import webbrowser
 from tkinter import ttk, simpledialog
 import tkinter as tk
 from fcc_checker import FCCChecker
-from models import UserConfiguration
+from models import UserConfiguration, Track
 from commondefs import API_KEY_LEN
 from system_config import SystemConfig
+import fcc_checker
 
 
 class SelectAlbumDialog(simpledialog.Dialog):
@@ -244,6 +245,7 @@ class UserConfigurationDialog(simpledialog.Dialog):
 
 class TrackEditDialog(simpledialog.Dialog):
     def __init__(self, parent, track):
+        self.fcc_comment_lbl = None
         self.parent = parent
         self.ok_clicked = False
         self.track_artist = track.artist if track.artist else ''
@@ -253,6 +255,11 @@ class TrackEditDialog(simpledialog.Dialog):
         self.track_fcc_status = track.fcc_status
         self.track_fcc_comment = track.fcc_comment if track.fcc_comment else ''
         self.track_song_url = track.song_url
+
+        # manuaul lyrics check
+        self.lyrics = None
+        self.lyrics_check_but = None
+
         super().__init__(parent, "Edit Track")
 
 
@@ -266,7 +273,7 @@ class TrackEditDialog(simpledialog.Dialog):
         tk.Label(master, text="Album:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
         tk.Label(master, text="Label:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
         tk.Label(master, text="FCC:").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-        link = tk.Label(master, text=self.track_song_url, fg='blue', cursor="hand2")
+        link = tk.Label(master, text=self.track_song_url, fg='green', cursor="hand2")
         link.grid(row=5, column=1, sticky="w", padx=0, pady=0)
         song_url = self.track_song_url if self.track_song_url else ''
         if song_url:
@@ -274,7 +281,16 @@ class TrackEditDialog(simpledialog.Dialog):
             song_url = ("" if have_prefix else "https://") + self.track_song_url
  
         link.bind("<Button-1>", lambda e : webbrowser.open_new(song_url))
-        tk.Label(master, text=self.track_fcc_comment).grid(row=6, column=1, sticky="w", padx=0, pady=0)
+        self.fcc_comment_lbl = tk.Label(master, text=self.track_fcc_comment)
+        self.fcc_comment_lbl.grid(row=6, column=1, sticky="w", padx=0, pady=0)
+
+        self.lyrics = tk.Text(master, width=50, height=15)
+        lyric_search_key = f"{self.track_artist} - {self.track_title}\n"
+        self.lyrics.insert("1.0", lyric_search_key)
+        self.lyrics.grid(row=7, column=1, sticky="w", padx=0, pady=0)
+        self.lyrics_check_but = tk.Button(master, text="Check Lyrics", width=10, command=self.check_lyrics)
+        self.lyrics_check_but.grid(row=8, column=1, sticky="w", padx=0, pady=0)
+
 
 
         # Create entry fields with initial values
@@ -312,5 +328,24 @@ class TrackEditDialog(simpledialog.Dialog):
         self.track_album = self.album_entry.get()
         self.track_label = self.label_entry.get()
         self.track_fcc_status = self.fcc_status_combo.get()
+        if self.track_fcc_status == FCCChecker.FCC_UNKNOWN:
+            self.track_fcc_comment = ''
+            self.track_song_url = ''
+
+
+    def check_lyrics(self):
+        lyrics = self.lyrics.get("1.0", "end-1c")
+        if len(lyrics) < 200:
+            tk.messagebox.showwarning(title="Error", message=f'The lyrics appear to be too short.', parent=self)
+        else:
+            fcc_check = FCCChecker(Track())
+            fcc_check.explicit_check(lyrics)
+            self.track_fcc_status = fcc_check.fcc_status
+            self.fcc_status_combo.set(self.track_fcc_status)
+            self.track_fcc_comment = fcc_check.explicit_msg
+            self.fcc_comment_lbl.config(text=fcc_check.explicit_msg)
+
+
+
 
 

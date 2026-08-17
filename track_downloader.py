@@ -148,6 +148,7 @@ class TrackDownloader():
         elif not os.path.exists(self.YTDL_PATH):
             message =  f"Yt-dlp path: {self.YTDL_PATH} is invalid. Please reinstall it."
         else:
+            # TODO to upgrade run: python3 -m pip install --upgrade yt_dlp
             result = subprocess.run([self.YTDL_PATH, "-U"], capture_output=True, text=True)
             message =  str(result.stdout)
 

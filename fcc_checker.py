@@ -117,7 +117,7 @@ class FCCChecker():
         return messagebox.askyesno("Confirm Lyrics", msg)
 
     def get_lyrics_genius(self):
-        url = lyrics = album = None
+        match_song = url = lyrics = album = None
         if not SystemConfig.genius_apikey:
             logit("Skipping Genius check, api key not set")
             return (None, None, None)
@@ -127,21 +127,24 @@ class FCCChecker():
             song = genius.search_song(artist=self.track.get_primary_artist(),
                                       title=self.track.get_primary_title())
             artist_match = song and self.track.have_artist_match(song.artist)
-            if song and not artist_match:
-                if not self.confirm_song_match(song.artist, song.title):
-                    song = None
+            title_match = song and self.track.have_title_match(song.title)
+            if artist_match and title_match:
+                match_song = song
+            elif title_match and self.confirm_song_match(song.artist, song.title):
+                match_song = song
 
-            if not song:
+            if not match_song:
                 # nothing found so try again with just the title in case song is a cover
                 song = genius.search_song(title=self.track.title)
-                if song and not self.confirm_song_match(song.artist, song.title):
-                    song = None
+                title_match = song and self.track.have_title_match(song.title)
+                if title_match and  self.confirm_song_match(song.artist, song.title):
+                    match_song = song
 
-            if song:
-                album = song.album.get('name', '') if song.album and artist_match else ''
-                logit(f"Found Genius song {song.title} on {album}: {song.api_path}")
-                lyrics = song.lyrics
-                url = song.url
+            if match_song:
+                album = match_song.album.get('name', '') if match_song.album and artist_match else ''
+                logit(f"Found Genius song {match_song.title} on {album}: {match_song.api_path}")
+                lyrics = match_song.lyrics
+                url = match_song.url
 
 
         except Exception as ex:
@@ -150,13 +153,7 @@ class FCCChecker():
         return (url, lyrics, album)
 
     def get_lyrics(self):
-        (url, lyrics, album) = self.get_lyrics_shazam()
-        if not lyrics:
-            (genius_url, lyrics, genius_album) = self.get_lyrics_genius()
-            if lyrics:
-                url = genius_url
-                album = genius_album if genius_album else album
-
+        (url, lyrics, album) = self.get_lyrics_genius()
         return (url, lyrics, album)
 
 
@@ -276,7 +273,7 @@ class FCCChecker():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(sys.argv) != 3:
         print("Usage: {} <ARTIST> <TRACK>".format(sys.argv[0]))
         sys.exit(1)
     else:
