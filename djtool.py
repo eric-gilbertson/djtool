@@ -27,7 +27,8 @@ VLC like media player optimized for use in live radio features include:
 #gettext.translation = safe_translation
 
 import glob,  json,  os,  pathlib,  platform,  shlex, webbrowser, ctypes
-import shutil,  sys,  threading,  time
+import shutil,  sys, time
+import subprocess
 import tkinter as tk,  traceback
 import sounddevice as sd
 from tkinter import PhotoImage
@@ -35,7 +36,6 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext
 
 from concurrent.futures import ThreadPoolExecutor
 from CTkMessagebox import CTkMessagebox
-from pydub import AudioSegment
 from tkinterdnd2 import TkinterDnD, DND_FILES
 from commondefs import *
 from djtool_dialogs import SelectAlbumDialog, LiveShowDialog, UserConfigurationDialog, TrackEditDialog
@@ -116,8 +116,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.bind('<FocusIn>', lambda e: self._on_focus_in())
         self.bind('<FocusOut>', lambda e: self._on_focus_out())
 
-        self._dragging_item = None          # internal reorder
-        self._dragging_start_id = None          # internal reorder
+        self._dragging_items = None          # internal reorder
         self._dragging_active = False
         self._insert_line = None            # blue insertion line widget
 
@@ -180,14 +179,12 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             x, y = top.winfo_pointerxy()
             if cursor and (widget := top.winfo_containing(x, y)):
                 try:
-                    logit(f"set widget: {cursor}")
                     widget.config(cursor=cursor)
                     self.last_cursor_widget = widget
                 except tk.TclError as ex:
                     logit(f"set widget exception: {cursor}")
                     pass
             elif not cursor and self.last_cursor_widget:
-                logit(f"set last widget: {cursor}")
                 self.last_cursor_widget.config(cursor=cursor) # handle case where user moused out of app
                 self.last_cursor_widget = None
             else:
@@ -248,6 +245,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 else:
                     return
             elif len(self.downloader.tracks) > 0:
+                missing_field = False
                 self._set_dirty(True)
                 for track in self.downloader.tracks:
                     # TODO: do these in background
@@ -257,20 +255,28 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     song_url = fcc_check.song_url
                     #track.fetch_label() - requires spotify premium
     
+                    missing_field = missing_field or not track.have_artist() or not track.have_title()
                     # replace with the genius album if we don't have a good album name already.
                     if fcc_check.album and not track.have_valid_album():
                         track.album = fcc_check.album
                 
                     self._insert_track(-1, status, comment, track.artist, track.title, track.album, track.label, track.file_path, True, song_url)
 
+                if missing_field:
+                    tk.messagebox.showwarning(title="Alert", message='Song title or artist is empty')
+
                 self.url.delete(0, "end")
                 self.url.update()
                 self.set_cursor("")
                 self.bell()
             else:
-                tk.messagebox.showwarning(title='Error', message=self.downloader.err_msg, parent=self)
                 self.set_cursor("")
                 self.bell()
+                if tk.messagebox.askokcancel(title='Error', message='Your download was aborted. Do you want to retry it?', parent=self):
+                    self.downloader.is_done = False
+                    self._fetch_track(True)
+                else:
+                    return
 
 
     def _edit_configuration(self):
@@ -535,6 +541,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             track.album = dialog.track_album
             track.label = dialog.track_label
             track.fcc_status = dialog.track_fcc_status
+            track.fcc_comment = dialog.track_fcc_comment
+            track.song_url = dialog.track_song_url
             row_values = self.tree.item(track.id)["values"]
             row_values = (*row_values[0:2], track.artist, track.title, track.album_display(), track.fcc_status_glyph())
             self.tree.item(track.id, values=row_values)
@@ -547,9 +555,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         selection = self.tree.selection()
         items = self.tree.get_children("")
 
+        is_down = direction == "down"
         if not selection:
             # if nothing selected, start at first/last
-            idx = 0 if direction == "down" else len(items) - 1
+            idx = 0 if is_down else len(items) - 1
         else:
             # last focused item index
             focus = self.tree.focus() or selection[-1]
@@ -558,14 +567,15 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             except ValueError:
                 idx = 0
 
-            idx = max(0, min(len(items) - 1, idx + (1 if direction == "down" else -1)))
+            idx = max(0, min(len(items) - 1, idx + (1 if is_down else -1)))
 
-        new_item = items[idx]
+        new_item_id = items[idx]
 
-        # Add new item to selection
-        self.tree.selection_add(new_item)
-        self.tree.focus(new_item)
-        self.tree.see(new_item)
+        self.tree.selection_add(new_item_id)
+        self.tree.focus(new_item_id)
+        self.tree.see(new_item_id)
+
+
         return "break"  # prevent default move
 
 
@@ -581,21 +591,28 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             start_time_secs = start_time_secs + track.duration
 
     def _delete_selected(self):
-        msg = "Do you want to also delete the audio files associated with the selected entries?"
-        response = messagebox.askyesnocancel("Confirm Request", msg, parent=self)
+        msg = "Do you want to remove the selected songs from the playlist"
+        doit = messagebox.askyesnocancel("Confirm Operation", msg, parent=self)
         self.tree.focus_set()      # Explicitly set focus back to the main window
-
-        if response is None:
+ 
+        if doit is None:
             return
-        else:
-            for item_id in self.tree.selection():
-                self.tree.delete(item_id)
-                track = self.tree_datamap.pop(item_id, None)
-                if response and os.path.exists(track.file_path) and track.is_downloaded_file():
-                    os.remove(track.file_path)
+
+        msg = '''Which of the associated music files should be deleted?'''
+        dialog = CTkMessagebox(title="File Deletion", message=msg, icon="question", option_1="Delete All Files", option_2="Delete Downloaded Files", option_3="No File Deletion")
+        answer = dialog.get()
+            
+        delete_all = answer == "Delete All Files"
+        delete_downloaded = answer == "Delete Downloaded Files"
+        for item_id in self.tree.selection():
+            self.tree.delete(item_id)
+            track = self.tree_datamap.pop(item_id, None)
+            file_exists = os.path.exists(track.file_path)
+            if file_exists and (delete_all or delete_downloaded and track.is_downloaded_file()):
+                os.remove(track.file_path)
   
-            self._renumber_rows()
-            self._set_dirty(True)
+        self._renumber_rows()
+        self._set_dirty(True)
 
     def _move_selection(self, direction: int):
         items = self.tree.get_children("")
@@ -643,22 +660,28 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     # ======================= INTERNAL REORDER DnD =======================
     def _tv_on_btn1_press(self, event):
-        self._dragging_item = None
+        self._dragging_items = None
         row_id = self.tree.identify_row(event.y)
-        if (event.state & 0x0001) != 0:
+        tree_selection = self.tree.selection()
+
+        if not row_id:
+            self.tree.selection_remove(*tree_selection) #unselect all if clicked outside
+        elif (event.state & 0x0001) != 0:
             track = self.tree_datamap[row_id]
             self.edit_track(track)
             return "break"
-        elif row_id:
-            self._dragging_item = row_id
-            self._dragging_active = False
-            self.tree.focus(row_id)
-
+        else:
             rows = list(self.tree.get_children(""))
-            self._dragging_start_idx = rows.index(row_id) if row_id else len(rows)
+            self._dragging_active = False
+            if len(tree_selection) > 1:
+                self._dragging_items = tree_selection
+                return 'break' # so that rows are not delselected
+            else:
+                self._dragging_items = (row_id,)
+
 
     def _on_drag_motion_internal(self, event):
-        if not self._dragging_item:
+        if not self._dragging_items:
             return
 
         self._dragging_active = True
@@ -670,42 +693,82 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             self._show_insert_line_at_end()
 
     def _on_drop_internal(self, event):
-        if not self._dragging_item or not self._dragging_active:
+        selections = self.tree.selection()
+        if not self._dragging_items or not self._dragging_active or len(selections) == 0:
             self._hide_insert_line()
             return
 
-
-        # Compute target by current mouse Y
-        self._set_dirty(True)
-        dragging = self._dragging_item
-        self._dragging_item = None
-
-        row = self.tree.identify_row(event.y)
         rows = list(self.tree.get_children(""))
-        drop_index = rows.index(row)  if row else len(rows)
-        drag_down = drop_index > self._dragging_start_idx
+        dragging = set(self._dragging_items)
+        remaining = [r for r in rows if r not in dragging]
+        target_row = self.tree.identify_row(event.y)
+        source_idx = self.tree.index(selections[0])
+        drop_idx = self.tree.index(target_row)
+        valid_drop = drop_idx - source_idx >=2 or drop_idx < source_idx
+        if not valid_drop:
+            self._hide_insert_line()
+            return
 
-        if drag_down:
-            start = self._dragging_start_idx + 1
-            end = drop_index - 1
-            for i in range(start, end):
-                row = rows[i]
-                self.tree.move(row, "", i - 1)
+        if target_row in remaining:
+            insert_pos = remaining.index(target_row)
+        else:
+            insert_pos = len(remaining)
 
-            drop_index = drop_index - 1
-        else: # drag up
-            start = drop_index
-            end = self._dragging_start_idx
-            for i in range(start, end):
-                row = rows[i]
-                self.tree.move(row, "", i + 1)
+        new_rows = (
+            remaining[:insert_pos]
+            + list(self._dragging_items)
+            + remaining[insert_pos:]
+        )
 
-        self.tree.move(dragging, "", drop_index)
-        self._hide_insert_line()
+        for index, item in enumerate(new_rows):
+            self.tree.move(item, "", index)        
+
         self._renumber_rows()
+        self._set_dirty(True)
+        self._hide_insert_line()
 
         # leave for a bit so user has visual feedback then clear.
-        self.after(500, lambda: self.tree.selection_set(()))
+        self.after(1000, lambda: self.tree.selection_set(()))
+
+
+
+#    def _on_drop_internal_XXXX(self, event):
+#        if not self._dragging_items or not self._dragging_active:
+#            self._hide_insert_line()
+#            return
+#
+#
+#        # Compute target by current mouse Y
+#        self._set_dirty(True)
+#        dragging = self._dragging_items
+#        self._dragging_items = None
+#
+#        row = self.tree.identify_row(event.y)
+#        rows = list(self.tree.get_children(""))
+#        drop_index = rows.index(row)  if row else len(rows)
+#        drag_down = drop_index > self._dragging_start_idx
+#
+#        if drag_down:
+#            start = self._dragging_start_idx + 1
+#            end = drop_index - 1
+#            for i in range(start, end):
+#                row = rows[i]
+#                self.tree.move(row, "", i - 1)
+#
+#            drop_index = drop_index - 1
+#        else: # drag up
+#            start = drop_index
+#            end = self._dragging_start_idx
+#            for i in range(start, end):
+#                row = rows[i]
+#                self.tree.move(row, "", i + 1)
+#
+#        self.tree.move(dragging, "", drop_index)
+#        self._hide_insert_line()
+#        self._renumber_rows()
+#
+#        # leave for a bit so user has visual feedback then clear.
+#        self.after(500, lambda: self.tree.selection_set(()))
 
     # ======================= EXTERNAL DROP (Finder) =======================
     def _on_drag_motion_external(self, event):
@@ -809,19 +872,19 @@ class AudioPlaylistApp(TkinterDnD.Tk):
     # ======================= PLAYLIST SAVE/LOAD =======================
     def save_mp3(self):
         try:
-            if not shutil.which("ffprobe"):
-                tk.messagebox.showwarning(title="Error", message='ffprobe is required for this operation.', parent=self)
+            if not self.FFMPEG_PATH:
+                tk.messagebox.showwarning(title="Error", message='ffmpeg is required for this operation.', parent=self)
                 return
     
             if not self.tree.get_children(""):
-                logit("[Save] No files to save.")
+                logit("No files to save.")
                 return
     
             msg = '''Would you like to export all songs or only those with an unknown FCC status?'''
             dialog = CTkMessagebox(title="MP3 Save", message=msg, icon="question", option_1="All Songs", option_2="Unknown FCC Songs Only")
             answer = dialog.get()
             all_tracks = answer == 'All Songs'
-            
+
             seconds = 0
             track_cnt = 0
             for item in self.tree.get_children(""):
@@ -845,44 +908,46 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             )
             if not filename:
                 return
-    
+
             self.set_cursor('clock')
-            logit('start wav file concatenation')
-            full_show = AudioSegment.empty()
             duration = 0
+            ffmpeg_cmd = [self.FFMPEG_PATH]
+            file_cnt = 0
             for item in self.tree.get_children(""):
                 track = self.tree_datamap[item]
-                logit(f"Concat: {track.title}")
                 if not all_tracks and track.fcc_status != 'NOT_FOUND':
                     continue
-    
-                duration = duration + track.duration
-    
-                audio = None
-                if track.file_path.endswith('.mp3') and os.path.exists(track.file_path):
-                    audio = AudioSegment.from_mp3(track.file_path)
-                elif track.file_path.endswith('.wav') and os.path.exists(track.file_path):
-                    audio = AudioSegment.from_wav(track.file_path)
-                elif track.file_path.endswith('.opus') and os.path.exists(track.file_path):
-                    audio = AudioSegment.from_file(track.file_path, format="ogg")
+
+                if track.file_path.lower().endswith((".mp3", ".wav", ".opus")):
+                    # don't need to escape file paths because not going through the shell.
+                    ffmpeg_cmd.extend(["-i", track.file_path ])
+                    duration = duration + track.duration
+                    file_cnt += 1
                 else:
                     skip_msg = f"Skipping missing or unsupported file: {track.file_path}"
                     logit(skip_msg)
-    
-                if audio:
-                    full_show = full_show + audio
-    
+
+            ffmpeg_inputs = "".join(f"[{i}:a]" for i in range(file_cnt))
+            ffmpeg_cmd.extend([ "-y",
+                "-filter_complex",
+                f"{ffmpeg_inputs}concat=n={file_cnt}:v=0:a=1[out]",
+                "-map", "[out]",
+                "-c:a", "libmp3lame",
+                filename
+            ])
             logit(f"start mp3 export {filename}")
-            full_show.export(filename, format="mp3")
-            logit(f"done mp3 export {filename}")
-            self.set_cursor('')
-            tk.messagebox.showwarning(title="MP3 File Saved", message=f'Playlist saved as {filename}', parent= self)
+            cmd_result = subprocess.run(ffmpeg_cmd,  capture_output=True, text=True, check=True)
+            logit(f"done mp3 export {filename}, {cmd_result.returncode}")
+            if cmd_result.returncode == 0:
+                tk.messagebox.showwarning(title="MP3 File Saved", message=f'Playlist saved as {filename}', parent= self)
+            else:
+                tk.messagebox.showwarning(title="MP3 Export Error", message=f'{cmd_result.stderr}', parent= self)
         except Exception as ex:
-            msg = f"Error occurred while exporting mp3 file: {ex}"
+            msg = f"Error occurred while exporting mp3 file: {ex.returncode}, {ex.stderr}"
             logit(msg)
             tk.messagebox.showwarning(title="Error", message=msg, parent= self)
 
-
+        self.set_cursor('')
 
     def fcc_set_unknown_to_safe(self):
         msg = '''Would you like set all tracks with unknown FCC status (yellow) to safe (green)?'''
@@ -1147,11 +1212,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     def live_show_change(self):
         if self.live_show.get():
-            if SystemConfig.check_have_user_key():
-                show_title = UserConfiguration.show_title
-                LiveShowDialog(self, show_title, "12 am")
-            else:
-                self.clear_live_show()
+            show_title = UserConfiguration.show_title
+            apikey = UserConfiguration.playlist_apikey
+            LiveShowDialog(self, show_title, "12 am", apikey)
         else:
             self.clear_live_show()
 
@@ -1159,8 +1222,8 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.live_show.set(False)
         self.playlist.id = None
 
-    def check_show_playlist(self, show_title):
-        if not self.playlist.check_show_playlist(show_title):
+    def check_show_playlist(self, show_title, apikey, proxy_apikey):
+        if not self.playlist.check_show_playlist(show_title, apikey, proxy_apikey):
             self.live_show.set(False)
 
     def copy_selected_rows(self):
@@ -1209,7 +1272,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         time_delta = cur_time - self.last_doubleclick_time
         self.last_doubleclick_time = cur_time
         # protect against false double click
-        if time_delta < 10:
+        if time_delta < 5:
             logit(f"ignore double_click: {time_delta}")
         else:
             self.play_selected()
@@ -1317,6 +1380,5 @@ if __name__ == "__main__":
         logit("load playlist: " + sys.argv[1])
         app.load_playlist(sys.argv[1])
 
-    app.after(500, app.downloader.check_dependencies())
     app.mainloop()
 

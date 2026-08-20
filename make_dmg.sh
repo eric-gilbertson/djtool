@@ -12,9 +12,9 @@ if [[ -z $VIRTUAL_ENV ]]; then
 fi
 
 rm -rf dist/*
-pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
+pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --hidden-import=sounddevice --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
 
-#pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --add-binary "yt-dlp_macos:yt-dlp_macos" --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
+#pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=sounddevice --hidden-import=pyaudio --add-binary "yt-dlp_macos:yt-dlp_macos" --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
 
 rm -rf dist/djtool
 

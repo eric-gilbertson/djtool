@@ -71,7 +71,7 @@ class YTDLPThread(threading.Thread):
             stdout = output_buffer.getvalue()
             self.done_callback(status, self.file_prefix, stdout)
         except Exception as ex:
-            ret_msg = f"An exception occurred during download {ex} \n\n{traceback.format_exc()}"
+            ret_msg = f"An exception occurred during download -{ex}-"
             logit(ret_msg)
             self.done_callback(1, self.file_prefix, ret_msg)
 
@@ -148,6 +148,7 @@ class TrackDownloader():
         elif not os.path.exists(self.YTDL_PATH):
             message =  f"Yt-dlp path: {self.YTDL_PATH} is invalid. Please reinstall it."
         else:
+            # TODO to upgrade run: python3 -m pip install --upgrade yt_dlp
             result = subprocess.run([self.YTDL_PATH, "-U"], capture_output=True, text=True)
             message =  str(result.stdout)
 
@@ -181,22 +182,6 @@ class TrackDownloader():
             logit(f"Error installing yt-dlp_macos: {ex}")
 
         return False
-
-    @staticmethod
-    def check_dependencies():
-        msg = None
-    
-        if not SystemConfig.user_apikey:
-            message=f'Live show updating is not available because your User API Key has not been set. Enter your administrator supplied apikey using the File->Configuration dialog. See View->Help for setup help information.'
-            tk.messagebox.showwarning(title='Incomplete Setup', message=message)
-        elif not SystemConfig.spotify_id or not SystemConfig.spotify_secret:
-            msg = '''Spotify features are not available because the Spotify apikeys have not been set. Check that your user key in the File->Configuration dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
-    
-            tk.messagebox.showwarning("Configuration Error", msg)
-        elif not SystemConfig.genius_apikey:
-            msg = '''The FCC check feature is not available because the Genius apikey has not been set. Check that your user key in the File->Configuration dialog matches the api key at https://kzsu.stanford.edu/internal/profile'''
-    
-            tk.messagebox.showwarning("Configuration Error", msg)
 
     def fetch_track(self, parent, track_specifier, use_fullname):
         logit(f"Enter fetch_track: {track_specifier}")
@@ -238,7 +223,7 @@ class TrackDownloader():
         elif use_fullname:
             self.track_url = track_specifier
 
-        is_watch = "youtube.com/watch?" in self.track_url
+        is_watch = "youtube.com/watch?" in self.track_url or 'youtube.com/shorts/' in self.track_url
         is_playlist = "youtube.com/playlist?" in self.track_url
         if not (is_watch or is_playlist):
             tk.messagebox.showwarning(title="Error", message=error_msg, parent=self.parent)
@@ -286,6 +271,7 @@ class TrackDownloader():
             self.name_too_long = True
         elif returnCode != 0:
             self.err_msg = f"yt-dlp download error: {stdOut}"
+            logit(self.err_msg);
         else:
             new_files = glob.glob(f"{dwnld_prefix}*")
             for new_file in new_files:
@@ -479,7 +465,7 @@ class SelectTrackDialog(simpledialog.Dialog):
             artists = ''
             seperator = ''
             for artist in track['artists']:
-                artists = f'{artists}{seperator}{artist['name']}'
+                artists = f'{artists}{seperator}{artist["name"]}'
                 seperator = ', '
             self.track.artist = artists
             self.on_close()

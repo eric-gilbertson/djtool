@@ -2,8 +2,10 @@ import webbrowser
 from tkinter import ttk, simpledialog
 import tkinter as tk
 from fcc_checker import FCCChecker
-from models import UserConfiguration
+from models import UserConfiguration, Track
+from commondefs import API_KEY_LEN
 from system_config import SystemConfig
+import fcc_checker
 
 
 class SelectAlbumDialog(simpledialog.Dialog):
@@ -98,24 +100,40 @@ class SelectAlbumDialog(simpledialog.Dialog):
 #    window.destroy() # Close the custom dialog after the choice is made
 
 class LiveShowDialog(simpledialog.Dialog):
-    def __init__(self, parent, show_title, show_start):
+    def __init__(self, parent, show_title, show_start, apikey):
         self.parent = parent
         self.show_title = show_title
         self.show_start = show_start
         self.show_title_entry = None
+        self.apikey = apikey
         self.ok_clicked = False
+        self.error_label = None
         super().__init__(parent, "Live Show Info")
 
     def body(self, master):
         info_msg = "Enter the name of your Zookeeper playlist. Note that playlist must be created in Zookeeper before performing this operation."
 
-        tk.Label(master, text=info_msg, wraplength=450, justify=tk.LEFT).grid(row=0, column=0, columnspan=2, sticky="ew", padx=0, pady=0)
+        row = 0
+        tk.Label(master, text=info_msg, wraplength=450, justify=tk.LEFT).grid(row=row, column=0, columnspan=2, sticky="ew", padx=0, pady=0)
 
-        tk.Label(master, text="Show Title:").grid(row=1, column=0, sticky="e", padx=5, pady=5)
+        row += 1
+        tk.Label(master, text="Show Title:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
         self.show_title_entry = tk.Entry(master, width=40)
         self.show_title_entry.insert(0, self.show_title)
         self.show_title_entry.bind('<Return>', self.ok)
-        self.show_title_entry.grid(row=1, column=1, padx=5, pady=5)
+        self.show_title_entry.grid(row=row, column=1, padx=5, pady=5)
+
+        row += 1
+        tk.Label(master, text="API Key:").grid(row=row, column=0, sticky="e", padx=5, pady=5)
+        self.apikey_entry = tk.Entry(master, width=40)
+        self.apikey_entry.insert(0, self.apikey)
+        self.apikey_entry.bind('<Return>', self.ok)
+        self.apikey_entry.grid(row=row, column=1, padx=5, pady=5)
+
+        row += row
+        self.error_label = tk.Label(master, fg='red', wraplength=450, justify=tk.LEFT)
+        self.error_label.grid(row=row, column=0, columnspan=2, sticky="ew", padx=0, pady=0)
+
         return self.show_title_entry  # focus on artist field by default
 
     def buttonbox(self):
@@ -126,8 +144,23 @@ class LiveShowDialog(simpledialog.Dialog):
         cancel_button.pack(side=tk.LEFT, padx=5, pady=5)
         box.pack()
 
+    def validate(self):
+        msg = None
+        if len(self.show_title_entry.get()) == 0:
+            msg = 'Show title is required'
+        elif len(self.apikey_entry.get()) != API_KEY_LEN:
+            msg = f'Invalid API KEY. The key must be {API_KEY_LEN} characters long'
+
+        if msg:
+            self.error_label.config(text=msg)
+
+        return not msg
+
+
     def apply(self):
-        self.parent.check_show_playlist(self.show_title_entry.get())
+        title = self.show_title_entry.get()
+        apikey = self.apikey_entry.get()
+        self.parent.check_show_playlist(title, apikey, '')
 
     def cancel(self, event=None):
         # This is called when 'Cancel' is pressed or window is closed
@@ -180,7 +213,6 @@ class UserConfigurationDialog(simpledialog.Dialog):
         return self.show_title_entry  # focus on artist field by default
 
     def validate(self):
-        API_KEY_LEN = 40
 
         keylen1 = len(self.user_apikey_entry.get())
         is_okay1 = keylen1 == 0 or keylen1 == API_KEY_LEN
@@ -213,6 +245,7 @@ class UserConfigurationDialog(simpledialog.Dialog):
 
 class TrackEditDialog(simpledialog.Dialog):
     def __init__(self, parent, track):
+        self.fcc_comment_lbl = None
         self.parent = parent
         self.ok_clicked = False
         self.track_artist = track.artist if track.artist else ''
@@ -222,6 +255,11 @@ class TrackEditDialog(simpledialog.Dialog):
         self.track_fcc_status = track.fcc_status
         self.track_fcc_comment = track.fcc_comment if track.fcc_comment else ''
         self.track_song_url = track.song_url
+
+        # manuaul lyrics check
+        self.lyrics = None
+        self.lyrics_check_but = None
+
         super().__init__(parent, "Edit Track")
 
 
@@ -235,7 +273,7 @@ class TrackEditDialog(simpledialog.Dialog):
         tk.Label(master, text="Album:").grid(row=2, column=0, sticky="e", padx=5, pady=5)
         tk.Label(master, text="Label:").grid(row=3, column=0, sticky="e", padx=5, pady=5)
         tk.Label(master, text="FCC:").grid(row=4, column=0, sticky="e", padx=5, pady=5)
-        link = tk.Label(master, text=self.track_song_url, fg='blue', cursor="hand2")
+        link = tk.Label(master, text=self.track_song_url, fg='green', cursor="hand2")
         link.grid(row=5, column=1, sticky="w", padx=0, pady=0)
         song_url = self.track_song_url if self.track_song_url else ''
         if song_url:
@@ -243,7 +281,16 @@ class TrackEditDialog(simpledialog.Dialog):
             song_url = ("" if have_prefix else "https://") + self.track_song_url
  
         link.bind("<Button-1>", lambda e : webbrowser.open_new(song_url))
-        tk.Label(master, text=self.track_fcc_comment).grid(row=6, column=1, sticky="w", padx=0, pady=0)
+        self.fcc_comment_lbl = tk.Label(master, text=self.track_fcc_comment)
+        self.fcc_comment_lbl.grid(row=6, column=1, sticky="w", padx=0, pady=0)
+
+        self.lyrics = tk.Text(master, width=50, height=15)
+        lyric_search_key = f"{self.track_artist} - {self.track_title}\n"
+        self.lyrics.insert("1.0", lyric_search_key)
+        self.lyrics.grid(row=7, column=1, sticky="w", padx=0, pady=0)
+        self.lyrics_check_but = tk.Button(master, text="Check Lyrics", width=10, command=self.check_lyrics)
+        self.lyrics_check_but.grid(row=8, column=1, sticky="w", padx=0, pady=0)
+
 
 
         # Create entry fields with initial values
@@ -281,5 +328,24 @@ class TrackEditDialog(simpledialog.Dialog):
         self.track_album = self.album_entry.get()
         self.track_label = self.label_entry.get()
         self.track_fcc_status = self.fcc_status_combo.get()
+        if self.track_fcc_status == FCCChecker.FCC_UNKNOWN:
+            self.track_fcc_comment = ''
+            self.track_song_url = ''
+
+
+    def check_lyrics(self):
+        lyrics = self.lyrics.get("1.0", "end-1c")
+        if len(lyrics) < 200:
+            tk.messagebox.showwarning(title="Error", message=f'The lyrics appear to be too short.', parent=self)
+        else:
+            fcc_check = FCCChecker(Track())
+            fcc_check.explicit_check(lyrics)
+            self.track_fcc_status = fcc_check.fcc_status
+            self.fcc_status_combo.set(self.track_fcc_status)
+            self.track_fcc_comment = fcc_check.explicit_msg
+            self.fcc_comment_lbl.config(text=fcc_check.explicit_msg)
+
+
+
 
 

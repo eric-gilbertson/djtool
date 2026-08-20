@@ -1,5 +1,7 @@
 import re, urllib, ssl, json, re
 from collections import Counter
+
+from models import Track
 from system_config import SystemConfig
 import sys
 import spotipy
@@ -21,6 +23,7 @@ from tkinter import messagebox
 # Congress of Wonders - Star Trip (clean, Genius)
 # India Ramey - Scattered And Smothered (fucked)
 # Bill Kirchen Honky - Tonk Hellfire (should find album even with no spaces around hyphen)
+# Tom Rush - Jamaica say you will (should find Shazam lyrics. instead uses genius version)
 
 class FCCChecker():
     SSL_CONTEXT = ssl._create_unverified_context()
@@ -102,8 +105,6 @@ class FCCChecker():
                 return None
         
             track = results["tracks"]["items"][0]
-            normalized_title = track["name"]
-            normalized_artist = track["artists"][0]["name"]
             is_explicit = track['explicit']
         except Exception as ex:
             logit(f"Exception getting album explicit from spotify {ex}")
@@ -116,45 +117,43 @@ class FCCChecker():
         return messagebox.askyesno("Confirm Lyrics", msg)
 
     def get_lyrics_genius(self):
-        url = lyrics = album =None
+        match_song = url = lyrics = album = None
         if not SystemConfig.genius_apikey:
-            logit("Skipping genius check, api key not set")
+            logit("Skipping Genius check, api key not set")
             return (None, None, None)
     
         try:
             genius = lyricsgenius.Genius(SystemConfig.genius_apikey, skip_non_songs=True, remove_section_headers=True)
-            artist_lc = self.track.artist.lower()
-            song = genius.search_song(artist=self.track.get_primary_artist(), title=self.track.get_primary_title())
-            song_artist_lc = song.artist.lower() if song else ''
-            artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
-            if song and not artist_match:
-                if not self.confirm_song_match(song.artist, song.title):
-                    # rejected first choice so tray again with just the title
-                    song = genius.search_song(title=self.track.title)
-                    song_artist_lc = song.artist.lower() if song else ''
-                    artist_match = song_artist_lc in artist_lc or artist_lc in song_artist_lc
-                    if song and not artist_match and not self.confirm_song_match(song.artist, song.title):
-                        song = None
-    
-            if song:
-                album = song.album.get('name', '') if song.album and artist_match else ''
-                logit(f"Found song {song.title} on {album}: {song.api_path}")
-                lyrics = song.lyrics
-                url = song.url
-    
+            song = genius.search_song(artist=self.track.get_primary_artist(),
+                                      title=self.track.get_primary_title())
+            artist_match = song and self.track.have_artist_match(song.artist)
+            title_match = song and self.track.have_title_match(song.title)
+            if artist_match and title_match:
+                match_song = song
+            elif title_match and self.confirm_song_match(song.artist, song.title):
+                match_song = song
+
+            if not match_song:
+                # nothing found so try again with just the title in case song is a cover
+                song = genius.search_song(title=self.track.title)
+                title_match = song and self.track.have_title_match(song.title)
+                if title_match and  self.confirm_song_match(song.artist, song.title):
+                    match_song = song
+
+            if match_song:
+                album = match_song.album.get('name', '') if match_song.album and artist_match else ''
+                logit(f"Found Genius song {match_song.title} on {album}: {match_song.api_path}")
+                lyrics = match_song.lyrics
+                url = match_song.url
+
+
         except Exception as ex:
             logit(f"Error fetching Genius lyrics {self.track.title}, {ex}")
     
         return (url, lyrics, album)
 
     def get_lyrics(self):
-        (url, lyrics, album) = self.get_lyrics_shazam()
-        if not lyrics:
-            (genius_url, lyrics, genius_album) = self.get_lyrics_genius()
-            if lyrics:
-                url = genius_url
-                album = genius_album if genius_album else album
-
+        (url, lyrics, album) = self.get_lyrics_genius()
         return (url, lyrics, album)
 
 
@@ -197,31 +196,31 @@ class FCCChecker():
             target_song = full_match_song
             if not target_song:
                 for candidate in title_match_songs:
-                    attrs = song['attributes']
+                    attrs = candidate['attributes']
                     if self.confirm_song_match(attrs['artistName'], attrs['name']):
                         target_song = candidate
                         break
 
             if target_song:
-                attrs = song['attributes']
+                attrs = target_song['attributes']
                 url = attrs['url']
                 ALBUM_KEY = '/album/'
                 idx1 = url.find(ALBUM_KEY)
                 ALBUM_KEY_LEN = len(ALBUM_KEY)
                 idx2 = url.find('/', idx1 + ALBUM_KEY_LEN + 1)
                 title = url[idx1+ALBUM_KEY_LEN : idx2]
-                return (target_song['id'], title, album_name)
+                return (target_song['id'], title, album_name, attrs['hasLyrics'])
 
-        return(None, None, None)
+        return(None, None, None, None)
     
     # get song lyrics by fetching the shazam page and scraping the lyrics by looking for the 
     # '"text": "' anchor and pulling everything between the start & end quotes. sanity check the
-    # indicies so we are insulated against returing false data in the case of a page format change.
+    # indices so we are insulated against returning false data in the case of a page format change.
     def get_lyrics_shazam(self):
         album = lyrics = url = ''
         try:
-            (id, title, album) = self.shazam_lookup()
-            if id and title:
+            (id, title, album, has_lyrics) = self.shazam_lookup()
+            if id and title and has_lyrics:
                 url = f"https://www.shazam.com/song/{id}/{title}"
                 req = urllib.request.Request(url, method=f'GET')
                 with urllib.request.urlopen(req, timeout=15, context=self.SSL_CONTEXT) as response:
@@ -241,7 +240,7 @@ class FCCChecker():
                     else:
                         logit(f"lyrics not found: {lyrics_start_idx}, {lyrics_end_idx}, {lyrics_offset}, {character_cnt}")
         except Exception as ex:
-            logit(f"Exectpion while fetching Shazam lyrics: {url}, {ex}")
+            logit(f"Exception while fetching Shazam lyrics: {url}, {ex}")
             url = None
         
         return (url, lyrics, album)
@@ -274,7 +273,7 @@ class FCCChecker():
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
+    if len(sys.argv) != 3:
         print("Usage: {} <ARTIST> <TRACK>".format(sys.argv[0]))
         sys.exit(1)
     else:

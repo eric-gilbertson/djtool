@@ -2,15 +2,13 @@ DJTool Installation & API Key Setup For Mac:
 
 - Download app installer by entering the following URL into a browser:
   kzsu.stanford.edu/djtool/download?filename=djtool.dmg
-- double-click the downloaded djtool.dmg file - will launch DJTool install window
+- double-click the downloaded djtool.dmg file - will launch the DJTool install window
 - drag the djtool icon to the Applications icon and release
-- close the DJTool installation window
-- using Finder, eject the DJTool app by clicking the small up arrow in the Locations section
 - click Applications in Finder and double click DJTool
-- from the can't be opened alert window, click OK
+- from the app can't be opened alert window, click OK
 - From System Preferences, click Security & Privacy and the General tab
 - Look for the Allow Apps Downloaded from: section and click Open Anyway for DJTool
-- get another can't be opened alert, click Open
+- will get an 'are you sure' alert, click Open
 - upon startup DJTool will display an alert stating that certain features are not available due to missing API keys, click Okay
 - open View->Help for getting started info
 - see below to set your API keys
@@ -28,7 +26,7 @@ DJTool Installation & API Key Setup For Windows:
 - see below to set your API keys
 
 
-User API Key Setup (optional, but needed for FCC checking and playlist generation):
+User API Key Setup (optional, but needed for enhanced FCC checking using Genius.com):
 - goto https://kzsu.stanford.edu/internal/profile/
 - click Add Key
 - copy your API Key being clicking on the clipboard icon

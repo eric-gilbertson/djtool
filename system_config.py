@@ -1,4 +1,5 @@
 import json
+import pathlib
 import ssl
 import tkinter.messagebox
 import urllib
@@ -13,30 +14,29 @@ class SystemConfig():
     spotify_secret = ''
     genius_apikey = ''
     playlist_host = ''
-    zookeeper_host = ''
-    zookeeper_apikey = ''
+    user_host = ''
     output_device = ''
     user_apikey = ''
     use_proxy = False
 
     @staticmethod
     def load_config(user_apikey_arg):
+        SYS_CONFIG_FILE = f'{pathlib.Path.home()}/.djtool_system.yaml'
         config_dict = {} 
         try:
-            with open('system_config.yaml', 'r') as file:
+            with open(SYS_CONFIG_FILE, 'r') as file:
                 config_dict = yaml.safe_load(file)
         except Exception as ex:
-            logit(f'Error reading system_config.yaml configuration file: {ex}')
+            logit(f'Exception reading system configuration file {SYS_CONFIG_FILE}: {ex}')
 
         config_dict = config_dict if config_dict else {} 
-        SystemConfig.playlist_host = config_dict.get('PLAYLIST_HOST', 'https://kzsu.stanford.edu')
-        SystemConfig.zookeeper_host = config_dict.get('ZOOKEEPER_HOST', 'https://zookeeper.stanford.edu')
-        SystemConfig.zookeeper_apikey = config_dict.get('ZOOKEEPER_APIKEY', '')
+        SystemConfig.playlist_host = config_dict.get('PLAYLIST_HOST', 'https://zookeeper.stanford.edu')
         SystemConfig.spotify_id = config_dict.get('SPOTIFY_ID', '')
         SystemConfig.spotify_secret = config_dict.get('SPOTIFY_SECRET', '')
         SystemConfig.genius_apikey = config_dict.get('GENIUS_APIKEY', '')
         SystemConfig.output_device = config_dict.get('OUTPUT_DEVICE', '')
         SystemConfig.user_apikey = config_dict.get('USER_APIKEY', '')
+        SystemConfig.user_host = config_dict.get('USER_HOST', 'https://kzsu.stanford.edu')
         SystemConfig.use_proxy = config_dict.get('USE_PROXY', False)
 
         if user_apikey_arg:
@@ -45,7 +45,7 @@ class SystemConfig():
         if SystemConfig.user_apikey and (not SystemConfig.spotify_id or not SystemConfig.spotify_secret or not SystemConfig.genius_apikey):
             try:
                 ssl_context = ssl._create_unverified_context()
-                req = urllib.request.Request(SystemConfig.playlist_host + '/djtool/helpertokens/')
+                req = urllib.request.Request(SystemConfig.user_host + '/djtool/helpertokens/')
                 req.add_header("Content-type", "application/vnd.api+json")
                 req.add_header("Accept", "text/plain")
                 req.add_header("X-APIKEY", SystemConfig.user_apikey)
@@ -60,7 +60,7 @@ class SystemConfig():
                     if not SystemConfig.genius_apikey:
                         SystemConfig.genius_apikey = resp_obj.get('genius_apikey', None)
             except Exception as e:
-                logit(f"Exception geting apikeys, {e}, {SystemConfig.user_apikey}")
+                logit(f"Exception getting apikeys, {e}, {SystemConfig.user_host}, {SystemConfig.user_apikey}")
 
     @staticmethod
     def check_have_user_key():
