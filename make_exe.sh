@@ -15,6 +15,9 @@ fi
 
 rm -rf dist/* Output/*
 
+# recommend installing the latest version of yt-dlp library before building.
+# with: pip install -U --pre "yt-dlp[default]"
+
 pyinstaller --noconfirm  --onefile --windowed --runtime-hook rthook_gettext_safe.py --hidden-import=RapidFffuzz --hidden-import=CTkMessageBox --hidden-import=pyaudio --add-data "djtool.ico:images" djtool.py
 
 "$INNO_PATH" djtool.iss
