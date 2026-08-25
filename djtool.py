@@ -69,6 +69,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
         self.is_appbundle = getattr(sys, 'frozen', False)
 
+        self.show_title = None
+        self.playlist_apikey = None
+
         if platform.system() == 'Darwin':
             # ---- macOS Dock reopen handler ----
             full_path = f"{self.get_resources_dir()}/djtool.png"
@@ -253,8 +256,9 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     status = fcc_check.fcc_status
                     comment = fcc_check.explicit_msg
                     song_url = fcc_check.song_url
-                    #track.fetch_label() - requires spotify premium
-    
+                    if fcc_check.album:
+                        track.album = fcc_check.album
+
                     missing_field = missing_field or not track.have_artist() or not track.have_title()
                     # replace with the genius album if we don't have a good album name already.
                     if fcc_check.album and not track.have_valid_album():
@@ -1212,9 +1216,11 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     def live_show_change(self):
         if self.live_show.get():
-            show_title = UserConfiguration.show_title
-            apikey = UserConfiguration.playlist_apikey
-            LiveShowDialog(self, show_title, "12 am", apikey)
+            if not self.show_title:   
+                self.show_title = UserConfiguration.show_title
+                self.playlist_apikey = UserConfiguration.playlist_apikey
+
+            LiveShowDialog(self, self.show_title, "12 am", self.playlist_apikey)
         else:
             self.clear_live_show()
 
@@ -1223,6 +1229,10 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self.playlist.id = None
 
     def check_show_playlist(self, show_title, apikey, proxy_apikey):
+        # cache these to re-populate the dialog in case in case validation fails.
+        self.show_title = show_title
+        self.playlist_apikey = apikey
+
         if not self.playlist.check_show_playlist(show_title, apikey, proxy_apikey):
             self.live_show.set(False)
 

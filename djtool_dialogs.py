@@ -165,6 +165,7 @@ class LiveShowDialog(simpledialog.Dialog):
     def cancel(self, event=None):
         # This is called when 'Cancel' is pressed or window is closed
         super().cancel(event)
+        self.parent.clear_live_show()
 
 class UserConfigurationDialog(simpledialog.Dialog):
     def __init__(self, parent):
