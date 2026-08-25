@@ -136,7 +136,9 @@ class TrackDownloader():
         if platform.system() == 'Darwin' and not self.YTDL_PATH:
             doit = tk.messagebox.askokcancel(title="Info", message='The yt-dlp downloader application was not found. Would you like to install it now (this will take around 30 seconds to complete)? Alternatively, you can install it manually per the instructions in the Vew->Help page.', parent=self.parent)
             if doit:
+                self.parent.set_cursor('clock')
                 version = self.install_ytdlp_macos(self.YTDL_ALT_PATH_MACOS)
+                self.parent.set_cursor('')
                 if version:
                     message = f"Yt-dlp {version} was installed at {self.YTDL_ALT_PATH_MACOS}"
                     self.YTDL_PATH = self.YTDL_ALT_PATH_MACOS
@@ -162,7 +164,7 @@ class TrackDownloader():
 
             os.mkdir(install_dir)
             
-            url = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_macos.zip"
+            url = "https://github.com/yt-dlp/yt-dlp-nightly-builds/releases/latest/download/yt-dlp_macos.zip"
             context = ssl.create_default_context(cafile=certifi.where())
             ssl._create_default_https_context = lambda: context
             zip_path = f"{install_dir}/yt-dlp_macos.zip"

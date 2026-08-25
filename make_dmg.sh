@@ -11,6 +11,9 @@ if [[ -z $VIRTUAL_ENV ]]; then
   exit 0
 fi
 
+# recommend installing the latest version of yt-dlp library before building.
+# with: python3 -m pip install -U --pre "yt-dlp[default]"
+#
 rm -rf dist/*
 pyinstaller --noconfirm  --onedir --windowed --icon=icon.icns --runtime-hook rthook_gettext_safe.py --hidden-import=pyaudio --hidden-import=sounddevice --add-data "$FFMPEG_PATH:helpers" --add-data "djtool.png:." --add-data "djtool.html:." djtool.py
 

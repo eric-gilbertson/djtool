@@ -276,7 +276,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             else:
                 self.set_cursor("")
                 self.bell()
-                if tk.messagebox.askokcancel(title='Error', message='Your download was aborted. Do you want to retry it?', parent=self):
+                if tk.messagebox.askokcancel(title='Error', message='Your download was aborted. Do you want to retry it? If the issue persists use File->Update yt-dlp.', parent=self):
                     self.downloader.is_done = False
                     self._fetch_track(True)
                 else:
