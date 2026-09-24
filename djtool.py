@@ -1325,7 +1325,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
     def prepare_track_for_playback(self, track):
         logit(f"prepare_track: {track.title}, {track.duration}")
-        if self._track_id:
+        if self._track_id and self._track_id in self.tree_datamap:
             old_track = self.tree_datamap[self._track_id]
             self.tree.item(self._track_id, tags=old_track.get_tags())
 

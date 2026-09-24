@@ -263,6 +263,22 @@ class TrackEditDialog(simpledialog.Dialog):
         super().__init__(parent, "Edit Track")
 
 
+    # must handle manually, else <CR> will close the dialog.
+    def do_return(self, event):
+        event.widget.insert(tk.INSERT, "\n")
+        return "break"
+
+    def do_copy(self, event):
+        copy_txt = event.widget.get("sel.first", "sel.last")
+        # if a single line then remove the ending <CR> so that it pates nicely into Shazam song search control
+        if 0 < len(copy_txt) < 80 and copy_txt.endswith("\n"):
+            copy_txt = copy_txt[:-1]
+
+        self.parent.clipboard_clear()
+        self.parent.clipboard_append(copy_txt)
+        return "break"
+       
+
     def body(self, master):
         #self.grab_set()
         #self.transient(self.parent)  # Set as child of parent
@@ -285,7 +301,10 @@ class TrackEditDialog(simpledialog.Dialog):
         self.fcc_comment_lbl.grid(row=6, column=1, sticky="w", padx=0, pady=0)
 
         self.lyrics = tk.Text(master, width=50, height=15)
-        lyric_search_key = f"{self.track_artist} - {self.track_title}\n"
+        self.lyrics.bind("<Command-c>", self.do_copy)
+        self.lyrics.bind("<Return>", self.do_return)
+
+        lyric_search_key = f"{self.track_artist} - {self.track_title} "
         self.lyrics.insert("1.0", lyric_search_key)
         self.lyrics.grid(row=7, column=1, sticky="w", padx=0, pady=0)
         self.lyrics_check_but = tk.Button(master, text="Check Lyrics", width=10, command=self.check_lyrics)
