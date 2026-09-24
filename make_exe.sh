@@ -22,4 +22,4 @@ pyinstaller --noconfirm  --onefile --windowed --runtime-hook rthook_gettext_safe
 
 "$INNO_PATH" djtool.iss
 
-scp Output/djtool_setup.exe ericg@kzsu.stanford.edu:/media/kzsu-audio-archive1/kzsu-aircheck-archives/featured_programs
+scp Output/djtool_setup.exe ericg@kzsu-lancaster.stanford.edu:/media/kzsu-audio-archive1/kzsu-aircheck-archives/featured_programs
