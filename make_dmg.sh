@@ -33,7 +33,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-scp dist/DJTool.dmg ericg@kzsu.stanford.edu:/media/kzsu-audio-archive1/kzsu-aircheck-archives/featured_programs
+scp dist/DJTool.dmg ericg@kzsu-lancaster.stanford.edu:/media/kzsu-audio-archive1/kzsu-aircheck-archives/featured_programs
 
 
 # Build the .app bundle with PyInstaller
