@@ -133,20 +133,23 @@ class FCCChecker():
             elif title_match and self.confirm_song_match(song.artist, song.title):
                 match_song = song
 
-            if not match_song:
-                # nothing found so try again with just the title in case song is a cover
-                song = genius.search_song(title=self.track.title)
-                title_match = song and self.track.have_title_match(song.title)
-                if title_match and  self.confirm_song_match(song.artist, song.title):
-                    match_song = song
-
             if match_song:
                 album = match_song.album.get('name', '') if match_song.album and artist_match else ''
                 logit(f"Found Genius song {match_song.title} on {album}: {match_song.api_path}")
                 lyrics = match_song.lyrics
                 url = match_song.url
-
-
+            else:
+                # nothing found so try again with just the title in case song is a cover
+                songs = genius.search_songs(self.track.title, 5, 1)
+                for song in songs['hits']:
+                    result = song['result']
+                    title = result['title']
+                    artist = result['artist_names']
+                    title_match = self.track.have_title_match(title)
+                    if title_match and  self.confirm_song_match(artist, title):
+                        lyrics = genius.lyrics(None, result['url'])
+                        url = result['url']
+                        break
         except Exception as ex:
             logit(f"Error fetching Genius lyrics {self.track.title}, {ex}")
     

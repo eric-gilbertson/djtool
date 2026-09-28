@@ -116,8 +116,8 @@ class Track():
         return is_spot
                 
     def is_readback_file(self):
-        is_audio = re.search('READBACK_[0-9]+\\.', self.file_path)
-        return is_audio
+        is_audio = re.search('READBACK_[0-9]', self.title)
+        return is_audio !=  None
 
     def is_stop_file(self):
         return self.title == Track.PAUSE_FILE or self.title == Track.MIC_BREAK_FILE

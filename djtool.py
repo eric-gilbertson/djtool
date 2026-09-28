@@ -27,6 +27,7 @@ VLC like media player optimized for use in live radio features include:
 #gettext.translation = safe_translation
 
 import glob,  json,  os,  pathlib,  platform,  shlex, webbrowser, ctypes
+import re
 import shutil,  sys, time
 import subprocess
 import tkinter as tk,  traceback
@@ -736,44 +737,6 @@ class AudioPlaylistApp(TkinterDnD.Tk):
 
 
 
-#    def _on_drop_internal_XXXX(self, event):
-#        if not self._dragging_items or not self._dragging_active:
-#            self._hide_insert_line()
-#            return
-#
-#
-#        # Compute target by current mouse Y
-#        self._set_dirty(True)
-#        dragging = self._dragging_items
-#        self._dragging_items = None
-#
-#        row = self.tree.identify_row(event.y)
-#        rows = list(self.tree.get_children(""))
-#        drop_index = rows.index(row)  if row else len(rows)
-#        drag_down = drop_index > self._dragging_start_idx
-#
-#        if drag_down:
-#            start = self._dragging_start_idx + 1
-#            end = drop_index - 1
-#            for i in range(start, end):
-#                row = rows[i]
-#                self.tree.move(row, "", i - 1)
-#
-#            drop_index = drop_index - 1
-#        else: # drag up
-#            start = drop_index
-#            end = self._dragging_start_idx
-#            for i in range(start, end):
-#                row = rows[i]
-#                self.tree.move(row, "", i + 1)
-#
-#        self.tree.move(dragging, "", drop_index)
-#        self._hide_insert_line()
-#        self._renumber_rows()
-#
-#        # leave for a bit so user has visual feedback then clear.
-#        self.after(500, lambda: self.tree.selection_set(()))
-
     # ======================= EXTERNAL DROP (Finder) =======================
     def _on_drag_motion_external(self, event):
         """While dragging from Finder, show insertion line."""
@@ -814,31 +777,41 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                 tk.messagebox.showwarning(title="Error", message=f'Ignoring invalid file:" {path}', parent=self)
                 continue
 
-            (artist, title, album) = self._get_track_info(path)
+            (artist, title, album) = self._get_track_info(pathlib.Path(path).stem)
             self._insert_track(insert_index, '', '', artist, title, album, '', path, file_count == 0, '')
             insert_index += 1  # subsequent files go after
             file_count = file_count - 1
 
         self._hide_insert_line()
 
-    def _get_track_info(self, file_path):
-        artist = ''
-        album = ''
-        title = pathlib.Path(file_path).stem
-        titleAr = title.split('^')
-        if len(titleAr) > 1:
-            artist = titleAr[0].strip()
-            title = titleAr[1].strip()
+    def _get_track_info(self, file_name):
+        split_ar = [r' - [0-9] - ', r'^', r'-']
+        artist = album = title = ''
 
-        if len(titleAr) > 2:
-            album = titleAr[2].strip()
+        for split_regex in split_ar:
+            split_ar = re.split(split_regex, file_name)
+            if len(split_ar) > 1:
+                artist = split_ar[0]
+                title = split_ar[1]
+                if len(split_ar) > 2: 
+                    album = split_ar[1]
 
-        return (artist, title, album)
+                return (artist, title, album)
 
+        return ('', '' '')
 
     def _insert_track(self, insert_index, fcc_status, fcc_comment, artist, title, album, label, path, update_list, song_url):
         if insert_index == -1:
             insert_index = len(self.tree.get_children(""))
+
+        if not fcc_status and artist and title:
+            track = Track(-1, None, None, artist, title, album, None, path, 0, None)
+            fcc_check = FCCChecker(track)
+            fcc_status = fcc_check.fcc_status
+            fcc_comment = fcc_check.explicit_msg
+            song_url = fcc_check.song_url
+            if fcc_check.album and not track.have_valid_album():
+                album = fcc_check.album
 
         track = Track(-1, fcc_status, fcc_comment, artist, title, album, label, path, 0, song_url)
         track.id = self.tree.insert("", insert_index, values=(insert_index+1, track.duration, artist, title, track.album_display(), track.fcc_status), tags=track.get_tags())
@@ -945,11 +918,12 @@ class AudioPlaylistApp(TkinterDnD.Tk):
             if cmd_result.returncode == 0:
                 tk.messagebox.showwarning(title="MP3 File Saved", message=f'Playlist saved as {filename}', parent= self)
             else:
-                tk.messagebox.showwarning(title="MP3 Export Error", message=f'{cmd_result.stderr}', parent= self)
+                logit(f"MP3 export error: {cmd_result.stderr}")
+                tk.messagebox.showwarning(title="MP3 Export Error", message=f'See log for details.', parent= self)
         except Exception as ex:
             msg = f"Error occurred while exporting mp3 file: {ex.returncode}, {ex.stderr}"
             logit(msg)
-            tk.messagebox.showwarning(title="Error", message=msg, parent= self)
+            tk.messagebox.showwarning(title="Error", message="MP3 Export exception. See log for details.", parent= self)
 
         self.set_cursor('')
 
@@ -1016,7 +990,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     if not messagebox.askyesno("Confirm Operation", msg, parent=self):
                         continue
 
-                (artist, title, album) = self._get_track_info(file_path)
+                (artist, title, album) = self._get_track_info(file_path.stem)
                 self._insert_track(-1, '-', '', artist, title, album, '', file_path, False, '')
                 new_files = True
 
