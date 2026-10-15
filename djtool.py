@@ -990,7 +990,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
                     if not messagebox.askyesno("Confirm Operation", msg, parent=self):
                         continue
 
-                (artist, title, album) = self._get_track_info(file_path.stem)
+                (artist, title, album) = self._get_track_info(pathlib.Path(file_path).stem)
                 self._insert_track(-1, '-', '', artist, title, album, '', file_path, False, '')
                 new_files = True
 

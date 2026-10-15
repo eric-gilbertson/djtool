@@ -139,6 +139,7 @@ class PlayerThread(threading.Thread):
 
                 self.updater.stop_event.set()
                 stream.close()
+                ffmpeg_process.kill() # needed when user stops track midstream
             except Exception as ex:
                 logit(f"Playback error: {ex}")
 

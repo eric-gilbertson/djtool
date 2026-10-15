@@ -38,6 +38,10 @@ Zookeeper API Key Setup (optional but needed to post spins to Zookeeper playlist
 - copy your API Key being clicking on the clipboard icon
 - in DJTool click File->Configure and paste the text into the Zookeeper API Key field
 
+Using DJTool from Studio A/B Macs:
+- hit CMD-SPACE and enter DJTool
+- double click on the djtool icon (multi-colored image with large microphone)
+
 Reporting Issues:
 If you encounter any issues please send email with the following:
 

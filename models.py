@@ -1,4 +1,6 @@
 import datetime, os, ssl, re
+import unicodedata
+
 from tinytag import TinyTag
 import json
 import pathlib
@@ -9,6 +11,23 @@ from  system_config import SystemConfig
 from commondefs import *
 from djutils import logit
 
+
+def normalize_name(name):
+    name = name.lower()
+
+    # 2. Decompose accents (e.g., 'é' becomes 'e')
+    name = "".join(c for c in unicodedata.normalize('NFD', name) if unicodedata.category(c) != 'Mn')
+
+    # 3. Replace hyphens with a space (optional, depending on your business rules)
+    name = name.replace('-', ' ')
+
+    # 4. Remove all remaining punctuation (keep only alphanumeric and spaces)
+    name = re.sub(r'[^a-z0-9\s]', '', name)
+
+    # 5. Collapse multiple spaces and trim
+    name = re.sub(r'\s+', ' ', name).strip()
+
+    return name
 
 class Track():
     PAUSE_FILE = 'PAUSE'
@@ -42,6 +61,8 @@ class Track():
     def have_artist(self):
         return self.artist and self.artist != '-'
 
+
+
     def have_artist_match(self, artist):
         artist_clean = re.sub(r'[^a-zA-Z0-9]', '', artist).lower()
         primary_artist_clean = re.sub(r'[^a-zA-Z0-9]', '', self.get_primary_artist()).lower()
@@ -51,9 +72,9 @@ class Track():
         return self.title and self.title != '-'
 
     def have_title_match(self, title):
-        title_clean = re.sub(r'[^a-zA-Z0-9]', '', title).lower()
-        primary_title_clean = re.sub(r'[^a-zA-Z0-9]', '', self.get_primary_title()).lower()
-        return title_clean in primary_title_clean or primary_title_clean in title_clean
+        title_clean = normalize_name(title)
+        primary_title_clean = normalize_name(self.get_primary_title())
+        return title_clean == primary_title_clean
 
     # treat ablum == title as false because YT incorrectly uses the
     # song title as the album name. if the FCC check finds another name
@@ -82,12 +103,14 @@ class Track():
     def get_primary_artist(self):
         delimiters = r'(\(|,|;| with | ft\. | featuring )'
         artist_ar = re.split(delimiters, self.artist)
-        return artist_ar[0].strip()
+        primary_artist = normalize_name(artist_ar[0])
+        return primary_artist
 
     def get_primary_title(self):
         delimiters = r'(\(|,|;| with | ft\. | featuring )'
         title_ar = re.split(delimiters, self.title)
-        return title_ar[0].strip()
+        primary_title = normalize_name(title_ar[0])
+        return primary_title
 
     # requires spotify premium account
     def fetch_label(self):
