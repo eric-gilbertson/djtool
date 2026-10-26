@@ -146,7 +146,8 @@ class FCCChecker():
                     title = result['title']
                     artist = result['artist_names']
                     title_match = self.track.have_title_match(title)
-                    if title_match and  self.confirm_song_match(artist, title):
+                    artist_match = self.track.have_artist_match(artist)
+                    if title_match and (artist_match or self.confirm_song_match(artist, title)):
                         lyrics = genius.lyrics(None, result['url'])
                         url = result['url']
                         break

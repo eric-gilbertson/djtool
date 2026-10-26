@@ -785,7 +785,7 @@ class AudioPlaylistApp(TkinterDnD.Tk):
         self._hide_insert_line()
 
     def _get_track_info(self, file_name):
-        split_ar = [r' - [0-9] - ', r'^', r'-']
+        split_ar = [r' - [0-9] - ', r'\^', r'-']
         artist = album = title = ''
 
         for split_regex in split_ar:
