@@ -49,6 +49,8 @@ If you encounter any issues please send email with the following:
 - screenshot of any error response
 - log file (djtool_log.txt in your home directory)
 
+GitHub repo: https://github.com/eric-gilbertson/djtool
+
 
 
 
