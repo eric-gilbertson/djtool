@@ -1,17 +1,25 @@
 # DJTool
 
-This Python3 program uses yt-dlp  to download audio tracks to the local disk and displays
-the downloaded files in a drag-and-drop enabled list control for easy transfer to other tools such
-as Audacity. In order to conserve disk space files are deleted several seconds after they
-are dragged, e.g. it assumes that the target tool creates its own copy of the file. Files
-are downloaded into ~/Music/ytdl. This program assumes that youtube-dl has been installed and
-included in the user's $PATH.
+DJTool is a VLC-like designed for creating both live and pre-recorded radio shows. Tracks can be downloads
+from YouTube using yt-dlp and plays them to the user selected output port. Features include:
 
-## Requirements
-   - Python 3.9+
-   - yt-dlp 2025.10.22+ (YT downloader)
-   - portaudio (audio player helper)
-   - ffmpeg (required if exporting program to MP3)
+    - Song lookup by artist and song title using fuzzy search, e.g. Kinks ; Lola
+    - Fast download of tracks in broadcast ready format
+    - Automatic playback start/stop for mic breaks and pauses
+    - Drag and drop track reordering
+    - Show export as an MP3 fil
+    - Automatic spin submission to playlist (live shows)
+    - Convenient track editing
+    - Accept file drops from external sources
+    - Song check for explicit lyrics
+    - Album title lookup
+    - Interface to USB Codecs
+    - Timestampded playlist generation
+
+Songs downloaded from YouTube are store under ~/Music/djtool/active. Existing songs can be imported
+into DJTool by dropping them onto the playlist grid or via Import Audio feature. It uses ffmpeg and yt-dlp
+to process music files. 
+
 
 ## Setup
 
